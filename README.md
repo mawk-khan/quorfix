@@ -67,6 +67,19 @@ frontend/           Next.js App Router project
    docker compose exec backend python manage.py createsuperuser
    ```
 
+5. Or, instead of step 4, seed a full set of **development-only** demo data — one
+   organization, one user per Community role, and three example projects:
+
+   ```bash
+   docker compose exec backend python manage.py seed_demo
+   # or:
+   make seed-demo
+   ```
+
+   Idempotent (safe to re-run) and refuses to run under production settings. It prints
+   the demo login credentials to the console — development-only accounts, never seeded
+   or exposed in production.
+
 API documentation (OpenAPI/Swagger) is served at `/api/docs/` once the backend is running.
 
 ## Testing
