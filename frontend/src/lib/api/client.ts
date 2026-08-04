@@ -1,3 +1,5 @@
+import { getCsrfToken } from "./csrf";
+
 const API_BASE_PATH = "/api";
 
 export class ApiError extends Error {
@@ -10,13 +12,25 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init?.headers as Record<string, string> | undefined),
+  };
+
+  // Session-authenticated mutating requests require this header — Django's
+  // CSRF cookie is only readable by JS because CSRF_COOKIE_HTTPONLY=False.
+  if (method !== "GET" && method !== "HEAD") {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      headers["X-CSRFToken"] = csrfToken;
+    }
+  }
+
   const response = await fetch(`${API_BASE_PATH}${path}`, {
     ...init,
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
+    headers,
   });
 
   if (!response.ok) {

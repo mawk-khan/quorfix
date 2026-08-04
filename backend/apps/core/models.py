@@ -21,3 +21,15 @@ class TimeStampedModel(models.Model):
 class BaseModel(UUIDPrimaryKeyModel, TimeStampedModel):
     class Meta:
         abstract = True
+
+
+class OrganizationScopedModel(BaseModel):
+    """Base for every tenant-owned model.
+
+    Uses a string FK reference so apps.core never imports apps.organizations.
+    """
+
+    organization = models.ForeignKey("organizations.Organization", on_delete=models.CASCADE)
+
+    class Meta:
+        abstract = True
