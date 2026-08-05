@@ -46,7 +46,7 @@ export default function ProjectDetailPage() {
 
   const membersQuery = useQuery({
     queryKey: ["members"],
-    queryFn: listMembers,
+    queryFn: () => listMembers(),
     enabled: isAdmin,
   });
 

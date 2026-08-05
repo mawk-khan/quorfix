@@ -104,6 +104,12 @@ npm run typecheck
 npm run test:e2e   # requires the dev server running
 ```
 
+## Local access and manual testing
+
+For local URLs, demo login credentials, the role permission matrix, a manual test checklist, and
+troubleshooting steps, see [docs/ACCESS_AND_TESTING.md](./docs/ACCESS_AND_TESTING.md). That
+document is the permanent, maintained reference — it is updated after every completed phase.
+
 ## Licensing
 
 Community code (everything outside `professional/` directories) is licensed under

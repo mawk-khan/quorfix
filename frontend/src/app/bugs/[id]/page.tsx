@@ -27,6 +27,8 @@ import { addTagSchema, type AddTagFormValues, updateBugSchema, type UpdateBugFor
 
 import { PriorityBadge, SeverityBadge, StatusBadge } from "../bug-badges";
 import { BugActivityFeed } from "./bug-activity-feed";
+import { BugAttachments } from "./bug-attachments";
+import { BugDiscussion } from "./bug-discussion";
 import { BugRelationshipsPanel } from "./bug-relationships-panel";
 
 const ASSIGNABLE_ROLES = new Set(["administrator", "developer", "qa"]);
@@ -77,7 +79,7 @@ export default function BugDetailPage() {
 
   const membersQuery = useQuery({
     queryKey: ["members"],
-    queryFn: listMembers,
+    queryFn: () => listMembers(),
     enabled: !!bugQuery.data?.can_assign,
   });
 
@@ -281,6 +283,12 @@ export default function BugDetailPage() {
 
   const isArchived = bug.archived_at !== null;
   const canEditContent = bug.editable_fields.length > 0;
+  // Comments and attachment uploads share the same role gate on the backend
+  // (apps.comments.policies.CAN_COMMENT_ROLES / apps.attachments.policies.
+  // CAN_UPLOAD_ROLES — administrator, developer, qa, reporter; viewer
+  // excluded). The backend re-checks this on every mutating request
+  // regardless — this only controls whether the create/upload UI renders.
+  const canCollaborate = session.role !== null && session.role !== "viewer";
   const eligibleAssignees = (membersQuery.data ?? []).filter((m) => ASSIGNABLE_ROLES.has(m.role));
 
   return (
@@ -653,6 +661,16 @@ export default function BugDetailPage() {
           )}
         </section>
       )}
+
+      <section className="space-y-2 border-t pt-4">
+        <h2 className="font-medium">Attachments</h2>
+        <BugAttachments bugId={bug.id} isArchived={isArchived} canUpload={canCollaborate} />
+      </section>
+
+      <section className="space-y-2 border-t pt-4">
+        <h2 className="font-medium">Discussion</h2>
+        <BugDiscussion bugId={bug.id} isArchived={isArchived} canComment={canCollaborate} />
+      </section>
 
       <section className="space-y-2 border-t pt-4">
         <h2 className="font-medium">Activity</h2>

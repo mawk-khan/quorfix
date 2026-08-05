@@ -1,0 +1,1 @@
+This is a small local test fixture used by e2e/collaboration-lifecycle.spec.ts.

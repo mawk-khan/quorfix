@@ -4,7 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
-import { addRelationship, listBugs, removeRelationship, type CreatableRelationshipType } from "@/lib/api/bugs";
+import { activityKeys, addRelationship, listBugs, removeRelationship, type CreatableRelationshipType } from "@/lib/api/bugs";
 import type { Bug } from "@/lib/api/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -39,7 +39,7 @@ export function BugRelationshipsPanel({ bug, onMutated, onError }: BugRelationsh
     onSuccess: (updated) => {
       setRelatedKey("");
       setResolveError(null);
-      queryClient.invalidateQueries({ queryKey: ["bugs", "activity", bug.id] });
+      queryClient.invalidateQueries({ queryKey: activityKeys.lists(bug.id) });
       onMutated(updated);
     },
     onError: (error) => {
@@ -55,7 +55,7 @@ export function BugRelationshipsPanel({ bug, onMutated, onError }: BugRelationsh
   const removeMutation = useMutation({
     mutationFn: (relationshipId: string) => removeRelationship(bug.id, relationshipId, bug.version),
     onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ["bugs", "activity", bug.id] });
+      queryClient.invalidateQueries({ queryKey: activityKeys.lists(bug.id) });
       onMutated(updated);
     },
     onError,

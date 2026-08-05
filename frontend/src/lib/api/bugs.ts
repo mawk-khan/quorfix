@@ -9,6 +9,16 @@ import type {
   PaginatedResponse,
 } from "./types";
 
+// Dedicated query-key helper for the bug activity feed, matching
+// notificationKeys' shape (frontend/src/lib/api/notifications.ts) — replaces
+// the ad hoc ["bugs", "activity", bugId, page] arrays previously hand-rolled
+// in bug-activity-feed.tsx and bug-relationships-panel.tsx.
+export const activityKeys = {
+  all: ["bugs", "activity"] as const,
+  lists: (bugId: string) => [...activityKeys.all, bugId] as const,
+  list: (bugId: string, page: number) => [...activityKeys.lists(bugId), page] as const,
+};
+
 // Only these two relationship types are ever created directly through the
 // relationships endpoint — duplicate_of is only ever created as a side
 // effect of transitionBug(status: "duplicate", duplicate_of: ...), never

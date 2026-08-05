@@ -16,25 +16,61 @@ vi.mock("@/lib/api/auth", () => ({
 vi.mock("@/lib/api/members", () => ({
   listMembers: vi.fn().mockResolvedValue([]),
 }));
-vi.mock("@/lib/api/bugs", () => ({
-  getBug: vi.fn(),
-  updateBug: vi.fn(),
-  transitionBug: vi.fn(),
-  assignBug: vi.fn(),
-  archiveBug: vi.fn(),
-  restoreBug: vi.fn(),
-  addTag: vi.fn(),
-  removeTag: vi.fn(),
-  watchBug: vi.fn(),
-  unwatchBug: vi.fn(),
-  listBugActivity: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
-  listBugs: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
-  addRelationship: vi.fn(),
-  removeRelationship: vi.fn(),
-}));
+vi.mock("@/lib/api/bugs", async () => {
+  // activityKeys is a plain query-key helper (no network I/O) consumed by
+  // bug-activity-feed.tsx and bug-relationships-panel.tsx — keep the real
+  // implementation rather than a stub so their queryKey shapes stay valid
+  // under this mock.
+  const actual = await vi.importActual<typeof import("@/lib/api/bugs")>("@/lib/api/bugs");
+  return {
+    activityKeys: actual.activityKeys,
+    getBug: vi.fn(),
+    updateBug: vi.fn(),
+    transitionBug: vi.fn(),
+    assignBug: vi.fn(),
+    archiveBug: vi.fn(),
+    restoreBug: vi.fn(),
+    addTag: vi.fn(),
+    removeTag: vi.fn(),
+    watchBug: vi.fn(),
+    unwatchBug: vi.fn(),
+    listBugActivity: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+    listBugs: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+    addRelationship: vi.fn(),
+    removeRelationship: vi.fn(),
+  };
+});
+vi.mock("@/lib/api/comments", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/comments")>("@/lib/api/comments");
+  return {
+    commentKeys: actual.commentKeys,
+    buildMentionToken: actual.buildMentionToken,
+    listComments: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+    createComment: vi.fn(),
+    updateComment: vi.fn(),
+    deleteComment: vi.fn(),
+    redactComment: vi.fn(),
+  };
+});
+vi.mock("@/lib/api/attachments", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/api/attachments")>("@/lib/api/attachments");
+  return {
+    attachmentKeys: actual.attachmentKeys,
+    ALLOWED_ATTACHMENT_CONTENT_TYPES: actual.ALLOWED_ATTACHMENT_CONTENT_TYPES,
+    MAX_ATTACHMENT_SIZE_BYTES: actual.MAX_ATTACHMENT_SIZE_BYTES,
+    formatFileSize: actual.formatFileSize,
+    listAttachments: vi.fn().mockResolvedValue({ count: 0, next: null, previous: null, results: [] }),
+    initiateAttachmentUpload: vi.fn(),
+    uploadAttachmentBytes: vi.fn(),
+    downloadAttachment: vi.fn(),
+    removeAttachment: vi.fn(),
+  };
+});
 
 import { getSession } from "@/lib/api/auth";
 import { archiveBug, getBug, updateBug } from "@/lib/api/bugs";
+import { listAttachments } from "@/lib/api/attachments";
+import { listComments } from "@/lib/api/comments";
 import BugDetailPage from "./page";
 
 function mockSession(role: Session["role"]): void {
@@ -211,5 +247,27 @@ describe("BugDetailPage", () => {
     renderWithProviders(<BugDetailPage />);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/does not exist or you don't have access/i);
+  });
+
+  it("renders the new attachments/discussion sections alongside existing controls without duplicate bug fetches", async () => {
+    mockSession("administrator");
+    // This file's other tests don't reset mocks between cases (each relies
+    // only on its own mockResolvedValueOnce), so getBug's call count
+    // accumulates across the whole file — assert the *increase* caused by
+    // this render, not an absolute count.
+    const getBugCallsBefore = vi.mocked(getBug).mock.calls.length;
+    vi.mocked(getBug).mockResolvedValueOnce(makeBug({ editable_fields: ["title"], can_archive: true }));
+    renderWithProviders(<BugDetailPage />);
+
+    await screen.findByRole("form", { name: /edit bug/i });
+    expect(await screen.findByRole("heading", { name: /attachments/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /discussion/i })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: /activity/i })).toBeInTheDocument();
+
+    // Pre-existing controls (archive) still work with the new sections mounted.
+    expect(screen.getByRole("button", { name: /^archive bug$/i })).toBeInTheDocument();
+    expect(listComments).toHaveBeenCalledWith("b1", 1);
+    expect(listAttachments).toHaveBeenCalledWith("b1", 1);
+    expect(vi.mocked(getBug).mock.calls.length - getBugCallsBefore).toBe(1);
   });
 });

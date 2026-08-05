@@ -200,3 +200,61 @@ export interface NotificationPreference {
   event_type: NotificationEventType;
   email_enabled: boolean;
 }
+
+export type CommentStatus = "active" | "deleted" | "redacted";
+
+export interface Mention {
+  id: string;
+  mentioned_user: User;
+}
+
+// can_edit/can_delete/can_redact are authoritative UI hints computed
+// server-side (apps.comments.serializers.CommentSerializer) — never
+// re-derived from a client-side copy of the role/edit-window matrix, and
+// never trusted in place of the backend's own 403/409 on the actual mutation.
+export interface Comment {
+  id: string;
+  author: User;
+  body: string;
+  status: CommentStatus;
+  mentions: Mention[];
+  edited_at: string | null;
+  deleted_at: string | null;
+  redacted_at: string | null;
+  can_edit: boolean;
+  can_delete: boolean;
+  can_redact: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type AttachmentStatus = "pending" | "uploaded" | "failed";
+
+export type ScanStatus = "not_scanned" | "pending" | "clean" | "infected";
+
+// can_remove is a UI hint only (apps.attachments.serializers.
+// AttachmentSerializer.get_can_remove) — it does not factor in archive
+// state, so the backend's actual 403/409 on removal remains authoritative.
+export interface Attachment {
+  id: string;
+  uploaded_by: User;
+  original_filename: string;
+  content_type: string;
+  size_bytes: number;
+  status: AttachmentStatus;
+  scan_status: ScanStatus;
+  uploaded_at: string | null;
+  removed_at: string | null;
+  can_remove: boolean;
+  created_at: string;
+}
+
+export interface AttachmentUploadInstructions {
+  method: "PUT";
+  url: string;
+}
+
+export interface AttachmentInitiateResponse {
+  attachment: Attachment;
+  upload: AttachmentUploadInstructions;
+}

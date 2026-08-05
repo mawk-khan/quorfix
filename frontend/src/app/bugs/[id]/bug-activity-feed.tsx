@@ -3,7 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 
-import { listBugActivity } from "@/lib/api/bugs";
+import { activityKeys, listBugActivity } from "@/lib/api/bugs";
 
 const VERB_LABELS: Record<string, string> = {
   created: "created this bug",
@@ -19,6 +19,13 @@ const VERB_LABELS: Record<string, string> = {
   relationship_removed: "removed a relationship",
   archived: "archived this bug",
   restored: "restored this bug",
+  comment_added: "added a comment",
+  comment_edited: "edited a comment",
+  comment_deleted: "deleted a comment",
+  comment_redacted: "redacted a comment",
+  mention_created: "mentioned a teammate",
+  attachment_added: "added an attachment",
+  attachment_removed: "removed an attachment",
 };
 
 function actorLabel(actor: { first_name: string; last_name: string; email: string } | null): string {
@@ -31,7 +38,7 @@ export function BugActivityFeed({ bugId }: { bugId: string }) {
   const [page, setPage] = useState(1);
 
   const query = useQuery({
-    queryKey: ["bugs", "activity", bugId, page],
+    queryKey: activityKeys.list(bugId, page),
     queryFn: () => listBugActivity(bugId, page),
   });
 

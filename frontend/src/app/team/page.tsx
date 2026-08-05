@@ -33,7 +33,7 @@ export default function TeamPage() {
 
   const membersQuery = useQuery({
     queryKey: ["members"],
-    queryFn: listMembers,
+    queryFn: () => listMembers(),
     enabled: !!session?.authenticated,
   });
   const invitationsQuery = useQuery({

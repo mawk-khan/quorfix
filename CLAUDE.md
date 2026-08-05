@@ -295,3 +295,7 @@ Before finishing:
 9. Report migrations.
 10. Report assumptions and unresolved risks.
 11. Confirm Community still functions without Professional modules.
+
+After completing any phase or chunk that changes routes, roles, credentials, demo data, setup
+commands, or user-visible functionality: update `docs/ACCESS_AND_TESTING.md`, verify all
+documented commands and URLs, and include the documentation update in the phase review.
