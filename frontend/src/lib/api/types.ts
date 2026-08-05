@@ -164,3 +164,39 @@ export interface BugActivity {
   metadata: Record<string, unknown>;
   created_at: string;
 }
+
+export type NotificationEventType =
+  | "bug_assigned"
+  | "mentioned"
+  | "comment_added"
+  | "status_changed"
+  | "bug_reopened";
+
+export type NotificationEmailStatus = "pending" | "sent" | "failed" | "disabled";
+
+export interface NotificationBugRef {
+  id: string;
+  key: string;
+  title: string;
+  status: BugStatus;
+}
+
+// Matches the backend's explicit allowlist (NotificationSerializer) — never
+// carries dedup_key, email_error, organization, or recipient; those are
+// deliberately never sent to the client.
+export interface Notification {
+  id: string;
+  event_type: NotificationEventType;
+  actor: User | null;
+  bug: NotificationBugRef;
+  comment_id: string | null;
+  read_at: string | null;
+  email_status: NotificationEmailStatus;
+  created_at: string;
+  target_url: string;
+}
+
+export interface NotificationPreference {
+  event_type: NotificationEventType;
+  email_enabled: boolean;
+}

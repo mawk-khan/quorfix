@@ -97,6 +97,20 @@ jobs:
         working-directory: backend
         run: nohup python manage.py runserver 0.0.0.0:8000 > backend.log 2>&1 &
 
+      # Notification delivery (Phase 4 Chunk 3) runs through
+      # apps.notifications.tasks via the real Redis broker in this
+      # workflow (config.settings.development is not CELERY_TASK_ALWAYS_EAGER),
+      # exactly like production — so without an actual worker consuming that
+      # queue, every dispatched notification task would sit in Redis forever
+      # and any spec asserting on notification state would hang until the
+      # job timeout. This mirrors docker-compose.yml's separate
+      # celery_worker service, which this CI job has no equivalent of
+      # otherwise (there is no docker compose here, each process is started
+      # directly).
+      - name: Start Celery worker
+        working-directory: backend
+        run: nohup celery -A config worker --loglevel=info > celery.log 2>&1 &
+
       - name: Wait for backend to be ready
         run: |
           for i in $(seq 1 30); do
@@ -164,5 +178,6 @@ jobs:
           name: server-logs
           path: |
             backend/backend.log
+            backend/celery.log
             frontend/frontend.log
           retention-days: 14

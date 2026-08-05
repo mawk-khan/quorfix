@@ -103,7 +103,33 @@ def create_comment(*, bug, author, membership, body: str) -> Comment:
         organization=bug.organization, bug=bug, author=author, body=normalized_body
     )
     _record(bug, author, ActivityVerb.COMMENT_ADDED, metadata={"comment_id": str(comment.id)})
-    _create_mentions(bug, comment, author)
+    created_mentions = _create_mentions(bug, comment, author)
+
+    # apps.notifications.services.notify already defers its Celery dispatch
+    # to transaction.on_commit internally, so calling it here (still inside
+    # this function's @transaction.atomic) is safe — it only ever fires once
+    # this transaction actually commits. mentioned fires only when at least
+    # one valid Mention row was persisted; comment_added always fires, and
+    # the task resolver (not this call site) is what excludes mentioned
+    # recipients from comment_added's watcher set.
+    from apps.notifications.models import NotificationEventType
+    from apps.notifications.services import notify
+
+    if created_mentions:
+        notify(
+            event_type=NotificationEventType.MENTIONED,
+            organization_id=bug.organization_id,
+            bug_id=bug.pk,
+            actor_id=author.pk,
+            comment_id=comment.pk,
+        )
+    notify(
+        event_type=NotificationEventType.COMMENT_ADDED,
+        organization_id=bug.organization_id,
+        bug_id=bug.pk,
+        actor_id=author.pk,
+        comment_id=comment.pk,
+    )
     return comment
 
 

@@ -388,8 +388,9 @@ def transition_bug(
         locked.version += 1
         locked.save(update_fields=update_fields)
 
+        assigned_activity = None
         if assignee_changed:
-            _record(
+            assigned_activity = _record(
                 locked,
                 actor,
                 ActivityVerb.ASSIGNED if assignee else ActivityVerb.UNASSIGNED,
@@ -402,9 +403,39 @@ def transition_bug(
                 ActivityVerb.RELATIONSHIP_ADDED,
                 to_value=f"duplicate_of:{target.key}",
             )
-        _record(
+        status_activity = _record(
             locked, actor, ActivityVerb.STATUS_CHANGED, from_value=from_status, to_value=new_status
         )
+
+    # Dispatched only after the transaction above has committed — see
+    # apps.notifications.services.notify, which itself defers the actual
+    # Celery dispatch to transaction.on_commit. bug_reopened and
+    # status_changed are mutually exclusive (never both) for the same
+    # transition; bug_assigned fires only when this call actually changed
+    # who's assigned, never on unassignment.
+    from apps.notifications.models import NotificationEventType
+    from apps.notifications.services import notify
+
+    if assignee_changed and assignee is not None:
+        notify(
+            event_type=NotificationEventType.BUG_ASSIGNED,
+            organization_id=locked.organization_id,
+            bug_id=locked.pk,
+            actor_id=actor.pk if actor else None,
+            activity_id=assigned_activity.id,
+            assignee_id=assignee.pk,
+        )
+    notify(
+        event_type=(
+            NotificationEventType.BUG_REOPENED
+            if new_status == BugStatus.REOPENED
+            else NotificationEventType.STATUS_CHANGED
+        ),
+        organization_id=locked.organization_id,
+        bug_id=locked.pk,
+        actor_id=actor.pk if actor else None,
+        activity_id=status_activity.id,
+    )
     return locked
 
 
@@ -437,12 +468,25 @@ def assign_bug(*, bug: Bug, actor, membership, assignee_id, expected_version: in
         locked.version += 1
         locked.save(update_fields=["assignee", "version"])
 
-        _record(
+        activity = _record(
             locked,
             actor,
             ActivityVerb.ASSIGNED if assignee else ActivityVerb.UNASSIGNED,
             from_value=previous.email if previous else "",
             to_value=assignee.email if assignee else "",
+        )
+
+    if assignee is not None:
+        from apps.notifications.models import NotificationEventType
+        from apps.notifications.services import notify
+
+        notify(
+            event_type=NotificationEventType.BUG_ASSIGNED,
+            organization_id=locked.organization_id,
+            bug_id=locked.pk,
+            actor_id=actor.pk if actor else None,
+            activity_id=activity.id,
+            assignee_id=assignee.pk,
         )
     return locked
 
