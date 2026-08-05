@@ -151,6 +151,19 @@ FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:3000")
 # comment. Administrators are not bound by this window.
 COMMENT_EDIT_WINDOW_MINUTES = 15
 
+# Attachments. Only a local storage backend exists so far (see
+# apps.attachments.providers) — an S3-compatible provider is a future addition,
+# not a setting to pre-declare here until it actually exists.
+#
+# The root is the general local media root, NOT an attachments-specific
+# subfolder: apps.attachments.services._build_storage_key already prefixes
+# every key with "attachments/" (organization/bug/attachment-id/extension —
+# a scheme meant to work the same way inside a future S3 bucket, where
+# "attachments/" would be one prefix among possibly several). Rooting here at
+# .../media/attachments too would nest an "attachments/attachments/..." path.
+MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
+ATTACHMENTS_LOCAL_ROOT = os.environ.get("ATTACHMENTS_LOCAL_ROOT", str(BASE_DIR / "media"))
+
 # Email (invitations). Backend and SMTP credentials are set per-environment.
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 

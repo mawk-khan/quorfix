@@ -23,6 +23,8 @@ class ActivityVerb(models.TextChoices):
     COMMENT_DELETED = "comment_deleted", "Comment deleted"
     COMMENT_REDACTED = "comment_redacted", "Comment redacted"
     MENTION_CREATED = "mention_created", "Mention created"
+    ATTACHMENT_ADDED = "attachment_added", "Attachment added"
+    ATTACHMENT_REMOVED = "attachment_removed", "Attachment removed"
 
 
 class BugActivity(UUIDPrimaryKeyModel):
