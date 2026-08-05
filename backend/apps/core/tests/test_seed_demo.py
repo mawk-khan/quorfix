@@ -6,6 +6,7 @@ from django.core.management.base import CommandError
 from django.test import override_settings
 from django.utils import timezone
 
+from apps.bugs.models import Bug, BugStatus
 from apps.organizations.models import (
     CommunityRole,
     Invitation,
@@ -97,6 +98,92 @@ def test_creates_organization_members_and_projects():
     assert projects["API"].name == "Legacy API"
     assert projects["API"].status == ProjectStatus.ON_HOLD
     assert projects["API"].lead_id == memberships["qa@bugfixer.local"].user.pk
+
+
+@pytest.mark.django_db
+class TestDemoBugs:
+    def test_creates_a_reasonable_number_of_bugs_across_projects_statuses_and_people(self):
+        run_seed_demo()
+
+        organization = Organization.objects.get(slug="bug-fixer-demo")
+        bugs = list(
+            Bug.objects.filter(organization=organization).select_related(
+                "project", "reporter", "assignee"
+            )
+        )
+
+        assert 10 <= len(bugs) <= 15
+
+        statuses = {b.status for b in bugs}
+        assert len(statuses) >= 5  # meaningfully spread across the workflow, not all "new"
+
+        priorities = {b.priority for b in bugs}
+        severities = {b.severity for b in bugs}
+        assert len(priorities) >= 3
+        assert len(severities) >= 3
+
+        projects_touched = {b.project.key for b in bugs}
+        assert projects_touched == {"BFW", "MOB", "API"}
+
+        assignees = {b.assignee.email for b in bugs if b.assignee is not None}
+        assert len(assignees) >= 2
+
+    def test_uses_the_real_create_bug_service_numbering(self):
+        run_seed_demo()
+
+        organization = Organization.objects.get(slug="bug-fixer-demo")
+        bfw = Project.objects.get(organization=organization, key="BFW")
+        bfw_bugs = sorted(Bug.objects.filter(project=bfw), key=lambda b: b.number)
+
+        # Sequential, gap-free, project-key-prefixed — exactly what
+        # create_bug() produces; seeding never sets number/key by hand.
+        assert [b.number for b in bfw_bugs] == list(range(1, len(bfw_bugs) + 1))
+        assert all(b.key == f"BFW-{b.number}" for b in bfw_bugs)
+
+    def test_duplicate_bug_is_linked_to_its_target(self):
+        run_seed_demo()
+
+        organization = Organization.objects.get(slug="bug-fixer-demo")
+        duplicate = Bug.objects.get(
+            organization=organization, title="Dashboard chart issue reported twice"
+        )
+        target = Bug.objects.get(
+            organization=organization, title="Dashboard chart fails to render for large datasets"
+        )
+        assert duplicate.status == BugStatus.DUPLICATE
+        assert duplicate.resolved_at is not None
+
+        from apps.bugs.models import BugRelationship, RelationshipType
+
+        assert BugRelationship.objects.filter(
+            from_bug=duplicate, to_bug=target, relationship_type=RelationshipType.DUPLICATE_OF
+        ).exists()
+
+    def test_repeated_seeding_does_not_duplicate_bugs_or_disturb_numbering(self):
+        run_seed_demo()
+
+        organization = Organization.objects.get(slug="bug-fixer-demo")
+        count_after_first_run = Bug.objects.filter(organization=organization).count()
+        numbers_after_first_run = {
+            (b.project.key, b.number)
+            for b in Bug.objects.filter(organization=organization).select_related("project")
+        }
+
+        run_seed_demo()
+        run_seed_demo()
+
+        assert Bug.objects.filter(organization=organization).count() == count_after_first_run
+        numbers_after_repeat = {
+            (b.project.key, b.number)
+            for b in Bug.objects.filter(organization=organization).select_related("project")
+        }
+        assert numbers_after_repeat == numbers_after_first_run
+
+        # Every project's next_bug_number is exactly "how many bugs it has
+        # plus one" — nothing left it inconsistent across the repeated runs.
+        for project in Project.objects.filter(organization=organization):
+            expected_next = Bug.objects.filter(project=project).count() + 1
+            assert project.next_bug_number == expected_next
 
 
 @pytest.mark.django_db

@@ -60,7 +60,16 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # Targets the `dev` stage (see frontend/Dockerfile), not the default
+      # last stage (`runner`), which hardcodes NODE_ENV=production for the
+      # production image. Building against `runner` here meant every
+      # `npm run dev` / `npm test` / `npm run lint` invocation against this
+      # container inherited that production NODE_ENV — React silently
+      # serves its production bundle either way, but for tests specifically
+      # that strips React.act, which @testing-library/react depends on.
+      target: dev
     command: npm run dev
     env_file: .env
     environment:

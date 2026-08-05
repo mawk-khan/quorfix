@@ -2,6 +2,8 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.bugs.models import Bug, BugStatus
+from apps.bugs.services import assign_bug, create_bug, transition_bug
 from apps.organizations.models import (
     CommunityRole,
     Invitation,
@@ -95,6 +97,140 @@ DEMO_PROJECTS = [
     },
 ]
 
+# Looked up by (project, title) for idempotency — not by key/number, since
+# those are assigned by the real sequential-numbering path in create_bug()
+# and must never be guessed or forced by seed data (that's exactly the
+# "don't manually force sequence counters into an inconsistent state"
+# constraint). `transitions` is the ordered list of statuses walked from
+# "new" via transition_bug(); `assignee`, when present, is applied first via
+# assign_bug() so any ASSIGNED/IN_PROGRESS transition in the list already
+# has an assignee to satisfy workflow.ASSIGNEE_REQUIRED_STATUSES.
+DEMO_BUGS = [
+    {
+        "project": "BFW",
+        "title": "Login button unresponsive on mobile Safari",
+        "description": "Tapping 'Sign in' on iOS Safari does nothing on the first tap.",
+        "reporter": "reporter",
+        "priority": "high",
+        "severity": "major",
+        "category": "Frontend",
+    },
+    {
+        "project": "BFW",
+        "title": "Dashboard chart fails to render for large datasets",
+        "description": "Charts with more than ~500 points never finish loading.",
+        "reporter": "reporter",
+        "assignee": "developer",
+        "priority": "urgent",
+        "severity": "critical",
+        "category": "Frontend",
+        "transitions": [BugStatus.ASSIGNED],
+    },
+    {
+        "project": "BFW",
+        "title": "Session expires while composing a comment",
+        "description": "Long-form comments are lost if the session times out mid-edit.",
+        "reporter": "qa",
+        "assignee": "developer",
+        "priority": "high",
+        "severity": "major",
+        "category": "Backend",
+        "transitions": [BugStatus.ASSIGNED, BugStatus.IN_PROGRESS],
+    },
+    {
+        "project": "BFW",
+        "title": "Exported CSV is missing the header row",
+        "reporter": "reporter",
+        "assignee": "qa",
+        "priority": "medium",
+        "severity": "minor",
+        "category": "Data export",
+        "transitions": [BugStatus.ASSIGNED, BugStatus.IN_PROGRESS, BugStatus.READY_FOR_QA],
+    },
+    {
+        "project": "BFW",
+        "title": "Password reset email arrives several minutes late",
+        "reporter": "reporter",
+        "assignee": "developer",
+        "priority": "high",
+        "severity": "major",
+        "category": "Notifications",
+        "transitions": [BugStatus.ASSIGNED, BugStatus.IN_PROGRESS, BugStatus.RESOLVED],
+    },
+    {
+        "project": "BFW",
+        "title": "Footer copyright year is out of date",
+        "reporter": "reporter",
+        "assignee": "developer",
+        "priority": "low",
+        "severity": "trivial",
+        "category": "Content",
+        "transitions": [
+            BugStatus.ASSIGNED,
+            BugStatus.IN_PROGRESS,
+            BugStatus.RESOLVED,
+            BugStatus.CLOSED,
+        ],
+    },
+    {
+        "project": "BFW",
+        "title": "Dashboard chart issue reported twice",
+        "reporter": "reporter",
+        "priority": "low",
+        "severity": "minor",
+        "category": "Frontend",
+        "transitions": [BugStatus.DUPLICATE],
+        "duplicate_of": "Dashboard chart fails to render for large datasets",
+    },
+    {
+        "project": "MOB",
+        "title": "App crashes when tapping a push notification",
+        "reporter": "qa",
+        "assignee": "developer",
+        "priority": "urgent",
+        "severity": "blocker",
+        "category": "Crash",
+        "transitions": [BugStatus.ASSIGNED, BugStatus.BLOCKED],
+    },
+    {
+        "project": "MOB",
+        "title": "Onboarding flow skips step 3 on first launch",
+        "reporter": "reporter",
+        "priority": "medium",
+        "severity": "major",
+        "category": "Onboarding",
+        "transitions": [BugStatus.TRIAGED],
+    },
+    {
+        "project": "API",
+        "title": "Rate limit headers use the wrong header name",
+        "reporter": "developer",
+        "priority": "medium",
+        "severity": "minor",
+        "category": "API",
+    },
+    {
+        "project": "API",
+        "title": "Legacy /v1/export endpoint returns 500 on an empty payload",
+        "reporter": "qa",
+        "assignee": "developer",
+        "priority": "low",
+        "severity": "minor",
+        "category": "API",
+        "transitions": [BugStatus.TRIAGED, BugStatus.WONT_FIX],
+    },
+    {
+        "project": "API",
+        "title": "Auth token refresh occasionally races the request queue",
+        "reporter": "admin",
+        "assignee": "developer",
+        "priority": "high",
+        "severity": "major",
+        "category": "Auth",
+        "transitions": [BugStatus.TRIAGED, BugStatus.CANNOT_REPRODUCE],
+    },
+]
+
 
 def _is_production_settings() -> bool:
     settings_module = getattr(settings, "SETTINGS_MODULE", "") or ""
@@ -127,6 +263,12 @@ class Command(BaseCommand):
 
         for spec in DEMO_PROJECTS:
             self._ensure_project(organization, spec, lead=users[spec["lead"]])
+        projects = {
+            spec["key"]: Project.objects.get(organization=organization, key=spec["key"])
+            for spec in DEMO_PROJECTS
+        }
+
+        self._ensure_bugs(organization, projects, users)
 
         self._report(organization)
 
@@ -286,6 +428,91 @@ class Command(BaseCommand):
             self.stdout.write(f"Updated project {spec['key']}.")
         else:
             self.stdout.write(f"Project {spec['key']} already up to date.")
+
+    # -- bugs -------------------------------------------------------------
+
+    def _ensure_bugs(self, organization: Organization, projects: dict, users: dict) -> None:
+        admin_user = users["admin"]
+        admin_membership = OrganizationMembership.objects.get(
+            organization=organization, user=admin_user
+        )
+        bugs_by_title: dict[str, Bug] = {}
+
+        for spec in DEMO_BUGS:
+            bugs_by_title[spec["title"]] = self._ensure_bug(
+                organization,
+                projects[spec["project"]],
+                users,
+                admin_user,
+                admin_membership,
+                spec,
+                bugs_by_title,
+            )
+
+    def _ensure_bug(
+        self,
+        organization: Organization,
+        project: Project,
+        users: dict,
+        admin_user,
+        admin_membership,
+        spec: dict,
+        bugs_by_title: dict,
+    ) -> Bug:
+        # Looked up by (project, title) — never by key/number, since those
+        # come only from create_bug()'s real sequential-numbering path.
+        # Skipping entirely when found (rather than reconciling status like
+        # _ensure_project does) keeps this idempotent without ever writing
+        # to Bug.version or Project.next_bug_number outside that path.
+        existing = Bug.objects.filter(
+            organization=organization, project=project, title=spec["title"]
+        ).first()
+        if existing is not None:
+            self.stdout.write(f"Bug '{spec['title']}' already exists in {project.key} — skipping.")
+            return existing
+
+        reporter = users[spec["reporter"]]
+        reporter_membership = OrganizationMembership.objects.get(
+            organization=organization, user=reporter
+        )
+
+        bug = create_bug(
+            organization=organization,
+            project=project,
+            reporter=reporter,
+            membership=reporter_membership,
+            title=spec["title"],
+            description=spec.get("description", ""),
+            category=spec.get("category", ""),
+            priority=spec.get("priority", "medium"),
+            severity=spec.get("severity", "major"),
+        )
+
+        assignee_key = spec.get("assignee")
+        if assignee_key:
+            bug = assign_bug(
+                bug=bug,
+                actor=admin_user,
+                membership=admin_membership,
+                assignee_id=str(users[assignee_key].pk),
+                expected_version=bug.version,
+            )
+
+        for target_status in spec.get("transitions", []):
+            kwargs = {}
+            if target_status == BugStatus.DUPLICATE:
+                kwargs["duplicate_of"] = str(bugs_by_title[spec["duplicate_of"]].pk)
+            bug = transition_bug(
+                bug=bug,
+                actor=admin_user,
+                membership=admin_membership,
+                new_status=target_status,
+                expected_version=bug.version,
+                **kwargs,
+            )
+
+        self.stdout.write(f"Created bug {bug.key} — {spec['title']} ({bug.status}).")
+        return bug
 
     # -- reporting ------------------------------------------------------
 

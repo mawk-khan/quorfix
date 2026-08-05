@@ -214,9 +214,7 @@ def _lock_organization_memberships(organization_id) -> list[OrganizationMembersh
 
 def _remaining_administrators(memberships: list[OrganizationMembership], excluding_pk) -> int:
     return sum(
-        1
-        for m in memberships
-        if m.role == CommunityRole.ADMINISTRATOR and m.pk != excluding_pk
+        1 for m in memberships if m.role == CommunityRole.ADMINISTRATOR and m.pk != excluding_pk
     )
 
 
@@ -241,4 +239,15 @@ def remove_member(*, membership: OrganizationMembership) -> None:
     if membership.role == CommunityRole.ADMINISTRATOR:
         if _remaining_administrators(org_memberships, excluding_pk=membership.pk) == 0:
             raise LastAdministratorError()
+
+    # Imports kept local to avoid a module-level Community-to-Community
+    # dependency between apps that otherwise have no reason to import each
+    # other; the membership is removed, not the user, so any project they
+    # led, or bug they were assigned, in this organization would otherwise
+    # keep pointing at someone with no access to it.
+    from apps.bugs.services import clear_bug_assignments
+    from apps.projects.services import clear_project_leadership
+
+    clear_project_leadership(organization=membership.organization, user=membership.user)
+    clear_bug_assignments(organization=membership.organization, user=membership.user)
     membership.delete()

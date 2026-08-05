@@ -25,4 +25,9 @@ export default function globalSetup() {
     "docker compose exec -T backend python manage.py shell -c " +
       `"from apps.organizations.models import SetupLock; SetupLock.objects.get_or_create(id=1)"`,
   );
+  // Seeds a dedicated org/users/project for e2e/bug-lifecycle.spec.ts —
+  // idempotent and namespaced independently of whatever team-journey.spec.ts
+  // or team-project-lifecycle.spec.ts create, so that spec never depends on
+  // which spec files ran first (see the command's own docstring).
+  run("docker compose exec -T backend python manage.py seed_e2e_bug_fixture");
 }

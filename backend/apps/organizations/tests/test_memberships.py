@@ -54,6 +54,31 @@ class TestMembershipMutations:
         assert response.status_code == 204
         assert not OrganizationMembership.objects.filter(pk=dev_membership.pk).exists()
 
+    def test_removing_a_member_clears_their_project_leadership_in_that_organization_only(
+        self, admin_client, organization, make_user, make_membership
+    ):
+        from apps.projects.models import Project
+
+        developer = make_user("dev@example.com")
+        dev_membership = make_membership(organization, developer, role=CommunityRole.DEVELOPER)
+        led_here = Project.objects.create(
+            organization=organization, key="ENG", name="Engine", lead=developer
+        )
+
+        other_org = Organization.objects.create(name="Other Co", slug="other-co")
+        make_membership(other_org, developer, role=CommunityRole.DEVELOPER)
+        led_elsewhere = Project.objects.create(
+            organization=other_org, key="ENG", name="Other Engine", lead=developer
+        )
+
+        response = admin_client.delete(f"/api/members/{dev_membership.pk}/")
+        assert response.status_code == 204
+
+        led_here.refresh_from_db()
+        led_elsewhere.refresh_from_db()
+        assert led_here.lead_id is None
+        assert led_elsewhere.lead_id == developer.pk
+
     def test_cannot_demote_the_sole_administrator(self, admin_client, admin_membership):
         response = admin_client.patch(f"/api/members/{admin_membership.pk}/", {"role": "developer"})
         assert response.status_code == 409

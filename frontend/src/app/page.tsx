@@ -44,6 +44,12 @@ export default function HomePage() {
       <Link href="/team" className="underline">
         Team
       </Link>
+      <Link href="/projects" className="underline">
+        Projects
+      </Link>
+      <Link href="/bugs" className="underline">
+        Bugs
+      </Link>
       <button type="button" onClick={handleSignOut} className="text-sm underline">
         Sign out
       </button>
