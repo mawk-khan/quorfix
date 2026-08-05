@@ -30,4 +30,10 @@ export default function globalSetup() {
   // or team-project-lifecycle.spec.ts create, so that spec never depends on
   // which spec files ran first (see the command's own docstring).
   run("docker compose exec -T backend python manage.py seed_e2e_bug_fixture");
+  // Seeds a dedicated org/users/project/deterministic-bugs fixture for
+  // e2e/dashboard.spec.ts — same independence rationale, with fixed
+  // relative day-offsets it expects to have available for the whole
+  // duration of this Playwright run (see the command's own docstring for
+  // the wall-clock-midnight safety margins).
+  run("docker compose exec -T backend python manage.py seed_e2e_analytics_fixture");
 }

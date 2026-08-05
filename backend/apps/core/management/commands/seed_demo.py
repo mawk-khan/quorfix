@@ -1,9 +1,11 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
+from django.utils import timezone
 
 from apps.bugs.models import Bug, BugStatus
 from apps.bugs.services import assign_bug, create_bug, transition_bug
+from apps.core.demo_data import backdate_bug_history, due_date_days_ago
 from apps.organizations.models import (
     CommunityRole,
     Invitation,
@@ -105,6 +107,23 @@ DEMO_PROJECTS = [
 # "new" via transition_bug(); `assignee`, when present, is applied first via
 # assign_bug() so any ASSIGNED/IN_PROGRESS transition in the list already
 # has an assignee to satisfy workflow.ASSIGNEE_REQUIRED_STATUSES.
+#
+# Phase 5 additions, for the analytics dashboard to have something
+# meaningful to chart:
+#   - created_days_ago backdates Bug.created_at (and its CREATED activity)
+#     so bugs are spread across ~45 days instead of all landing on "now".
+#   - resolution_days_ago is an ordered (oldest-first) list of day-offsets,
+#     one per resolution-transition activity (verb=status_changed,
+#     to_value in RESOLUTION_STATUSES) the bug's `transitions` walk
+#     actually produces — most bugs have at most one; a bug that gets
+#     reopened and resolved again has two, in order.
+#   - closed_days_ago backdates Bug.closed_at (and its CLOSED activity)
+#     for bugs whose `transitions` end in CLOSED.
+#   - due_days_ago sets a due_date `due_days_ago` days in the past — used
+#     for the one deliberately overdue demo bug.
+# See apps.core.demo_data.backdate_bug_history for how these are applied;
+# only ever via queryset.update() (bypassing auto_now_add), never by
+# editing next_bug_number, number, key, or version.
 DEMO_BUGS = [
     {
         "project": "BFW",
@@ -114,6 +133,7 @@ DEMO_BUGS = [
         "priority": "high",
         "severity": "major",
         "category": "Frontend",
+        "created_days_ago": 2,
     },
     {
         "project": "BFW",
@@ -125,6 +145,7 @@ DEMO_BUGS = [
         "severity": "critical",
         "category": "Frontend",
         "transitions": [BugStatus.ASSIGNED],
+        "created_days_ago": 4,
     },
     {
         "project": "BFW",
@@ -136,6 +157,7 @@ DEMO_BUGS = [
         "severity": "major",
         "category": "Backend",
         "transitions": [BugStatus.ASSIGNED, BugStatus.IN_PROGRESS],
+        "created_days_ago": 6,
     },
     {
         "project": "BFW",
@@ -146,6 +168,7 @@ DEMO_BUGS = [
         "severity": "minor",
         "category": "Data export",
         "transitions": [BugStatus.ASSIGNED, BugStatus.IN_PROGRESS, BugStatus.READY_FOR_QA],
+        "created_days_ago": 9,
     },
     {
         "project": "BFW",
@@ -156,6 +179,8 @@ DEMO_BUGS = [
         "severity": "major",
         "category": "Notifications",
         "transitions": [BugStatus.ASSIGNED, BugStatus.IN_PROGRESS, BugStatus.RESOLVED],
+        "created_days_ago": 15,
+        "resolution_days_ago": [3],
     },
     {
         "project": "BFW",
@@ -171,6 +196,9 @@ DEMO_BUGS = [
             BugStatus.RESOLVED,
             BugStatus.CLOSED,
         ],
+        "created_days_ago": 20,
+        "resolution_days_ago": [10],
+        "closed_days_ago": 4,
     },
     {
         "project": "BFW",
@@ -181,6 +209,8 @@ DEMO_BUGS = [
         "category": "Frontend",
         "transitions": [BugStatus.DUPLICATE],
         "duplicate_of": "Dashboard chart fails to render for large datasets",
+        "created_days_ago": 4,
+        "resolution_days_ago": [3],
     },
     {
         "project": "MOB",
@@ -191,6 +221,7 @@ DEMO_BUGS = [
         "severity": "blocker",
         "category": "Crash",
         "transitions": [BugStatus.ASSIGNED, BugStatus.BLOCKED],
+        "created_days_ago": 7,
     },
     {
         "project": "MOB",
@@ -200,6 +231,7 @@ DEMO_BUGS = [
         "severity": "major",
         "category": "Onboarding",
         "transitions": [BugStatus.TRIAGED],
+        "created_days_ago": 11,
     },
     {
         "project": "API",
@@ -208,6 +240,7 @@ DEMO_BUGS = [
         "priority": "medium",
         "severity": "minor",
         "category": "API",
+        "created_days_ago": 14,
     },
     {
         "project": "API",
@@ -218,6 +251,8 @@ DEMO_BUGS = [
         "severity": "minor",
         "category": "API",
         "transitions": [BugStatus.TRIAGED, BugStatus.WONT_FIX],
+        "created_days_ago": 18,
+        "resolution_days_ago": [9],
     },
     {
         "project": "API",
@@ -228,6 +263,162 @@ DEMO_BUGS = [
         "severity": "major",
         "category": "Auth",
         "transitions": [BugStatus.TRIAGED, BugStatus.CANNOT_REPRODUCE],
+        "created_days_ago": 22,
+        "resolution_days_ago": [11],
+    },
+    # -- Phase 5 additions: deferred/reopened statuses, an overdue bug, more
+    # assignees and projects, and a resolve -> reopen -> resolve-again
+    # history for the resolution-time/trend divergence to be visible.
+    {
+        "project": "BFW",
+        "title": "User avatar upload silently fails above 2MB",
+        "reporter": "reporter",
+        "assignee": "qa",
+        "priority": "medium",
+        "severity": "major",
+        "category": "Frontend",
+        "transitions": [BugStatus.TRIAGED, BugStatus.DEFERRED],
+        "created_days_ago": 13,
+    },
+    {
+        "project": "BFW",
+        "title": "Keyboard navigation skips the search field",
+        "reporter": "reporter",
+        "priority": "low",
+        "severity": "minor",
+        "category": "Accessibility",
+        "created_days_ago": 1,
+    },
+    {
+        "project": "BFW",
+        "title": "Bulk bug export times out for large projects",
+        "reporter": "qa",
+        "assignee": "admin",
+        "priority": "urgent",
+        "severity": "critical",
+        "category": "Performance",
+        "transitions": [BugStatus.TRIAGED, BugStatus.ASSIGNED],
+        "created_days_ago": 8,
+        "due_days_ago": 5,
+    },
+    {
+        "project": "BFW",
+        "title": "Notification email uses wrong timezone",
+        "reporter": "reporter",
+        "assignee": "developer",
+        "priority": "high",
+        "severity": "major",
+        "category": "Notifications",
+        "transitions": [
+            BugStatus.TRIAGED,
+            BugStatus.IN_PROGRESS,
+            BugStatus.RESOLVED,
+            BugStatus.REOPENED,
+        ],
+        "created_days_ago": 25,
+        "resolution_days_ago": [15],
+    },
+    {
+        "project": "BFW",
+        "title": "Search results pagination loses filters",
+        "reporter": "reporter",
+        "assignee": "developer",
+        "priority": "low",
+        "severity": "major",
+        "category": "Frontend",
+        "transitions": [
+            BugStatus.TRIAGED,
+            BugStatus.IN_PROGRESS,
+            BugStatus.RESOLVED,
+            BugStatus.REOPENED,
+            BugStatus.IN_PROGRESS,
+            BugStatus.RESOLVED,
+        ],
+        "created_days_ago": 40,
+        "resolution_days_ago": [30, 5],
+    },
+    {
+        "project": "MOB",
+        "title": "Push token refresh loop drains battery",
+        "reporter": "qa",
+        "assignee": "developer",
+        "priority": "urgent",
+        "severity": "blocker",
+        "category": "Performance",
+        "transitions": [BugStatus.TRIAGED, BugStatus.IN_PROGRESS],
+        "created_days_ago": 3,
+    },
+    {
+        "project": "MOB",
+        "title": "Deep link fails to open correct screen",
+        "reporter": "reporter",
+        "priority": "medium",
+        "severity": "minor",
+        "category": "Navigation",
+        "transitions": [BugStatus.TRIAGED],
+        "created_days_ago": 6,
+    },
+    {
+        "project": "MOB",
+        "title": "App icon badge count is inaccurate",
+        "reporter": "reporter",
+        "assignee": "qa",
+        "priority": "low",
+        "severity": "trivial",
+        "category": "Notifications",
+        "transitions": [
+            BugStatus.TRIAGED,
+            BugStatus.ASSIGNED,
+            BugStatus.IN_PROGRESS,
+            BugStatus.READY_FOR_QA,
+            BugStatus.RESOLVED,
+            BugStatus.CLOSED,
+        ],
+        "created_days_ago": 35,
+        "resolution_days_ago": [20],
+        "closed_days_ago": 10,
+    },
+    {
+        "project": "API",
+        "title": "Webhook retries do not use exponential backoff",
+        "reporter": "developer",
+        "assignee": "admin",
+        "priority": "high",
+        "severity": "major",
+        "category": "Integrations",
+        "transitions": [BugStatus.TRIAGED, BugStatus.IN_PROGRESS],
+        "created_days_ago": 5,
+    },
+    {
+        "project": "API",
+        "title": "Pagination cursor breaks on deleted records",
+        "reporter": "qa",
+        "priority": "medium",
+        "severity": "major",
+        "category": "API",
+        "transitions": [BugStatus.TRIAGED, BugStatus.BLOCKED],
+        "created_days_ago": 17,
+    },
+    {
+        "project": "API",
+        "title": "GraphQL schema introspection exposes internal fields",
+        "reporter": "admin",
+        "assignee": "developer",
+        "priority": "urgent",
+        "severity": "critical",
+        "category": "Security",
+        "transitions": [BugStatus.TRIAGED, BugStatus.IN_PROGRESS, BugStatus.RESOLVED],
+        "created_days_ago": 12,
+        "resolution_days_ago": [2],
+    },
+    {
+        "project": "API",
+        "title": "Duplicate webhook events sent on retry",
+        "reporter": "reporter",
+        "priority": "low",
+        "severity": "minor",
+        "category": "Integrations",
+        "created_days_ago": 1,
     },
 ]
 
@@ -268,7 +459,7 @@ class Command(BaseCommand):
             for spec in DEMO_PROJECTS
         }
 
-        self._ensure_bugs(organization, projects, users)
+        self._ensure_bugs(organization, projects, users, reference_now=timezone.now())
 
         self._report(organization)
 
@@ -431,7 +622,9 @@ class Command(BaseCommand):
 
     # -- bugs -------------------------------------------------------------
 
-    def _ensure_bugs(self, organization: Organization, projects: dict, users: dict) -> None:
+    def _ensure_bugs(
+        self, organization: Organization, projects: dict, users: dict, *, reference_now
+    ) -> None:
         admin_user = users["admin"]
         admin_membership = OrganizationMembership.objects.get(
             organization=organization, user=admin_user
@@ -447,6 +640,7 @@ class Command(BaseCommand):
                 admin_membership,
                 spec,
                 bugs_by_title,
+                reference_now=reference_now,
             )
 
     def _ensure_bug(
@@ -458,6 +652,8 @@ class Command(BaseCommand):
         admin_membership,
         spec: dict,
         bugs_by_title: dict,
+        *,
+        reference_now,
     ) -> Bug:
         # Looked up by (project, title) — never by key/number, since those
         # come only from create_bug()'s real sequential-numbering path.
@@ -486,6 +682,7 @@ class Command(BaseCommand):
             category=spec.get("category", ""),
             priority=spec.get("priority", "medium"),
             severity=spec.get("severity", "major"),
+            due_date=due_date_days_ago(spec.get("due_days_ago")),
         )
 
         assignee_key = spec.get("assignee")
@@ -510,6 +707,14 @@ class Command(BaseCommand):
                 expected_version=bug.version,
                 **kwargs,
             )
+
+        backdate_bug_history(
+            bug,
+            reference_now=reference_now,
+            created_days_ago=spec.get("created_days_ago"),
+            resolution_days_ago=spec.get("resolution_days_ago"),
+            closed_days_ago=spec.get("closed_days_ago"),
+        )
 
         self.stdout.write(f"Created bug {bug.key} — {spec['title']} ({bug.status}).")
         return bug

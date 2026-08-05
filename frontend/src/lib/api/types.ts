@@ -258,3 +258,93 @@ export interface AttachmentInitiateResponse {
   attachment: Attachment;
   upload: AttachmentUploadInstructions;
 }
+
+// -- analytics dashboard ----------------------------------------------------
+//
+// Every number here is authoritative — computed server-side in
+// apps.analytics.selectors. The frontend never recomputes a total,
+// percentage, or duration from raw data; it only formats what the backend
+// already returned. See docs/ACCESS_AND_TESTING.md for which sections
+// respect the date-range filter and which are current-state snapshots.
+
+export interface AnalyticsSummary {
+  open_bugs: number;
+  overdue_bugs: number;
+  new_bugs: number;
+  resolved_bugs: number;
+}
+
+export interface TrendPoint {
+  date: string;
+  created: number;
+  resolved: number;
+}
+
+export interface ResolutionTimeEntry {
+  priority: BugPriority;
+  // Null means no bug at this priority currently has a resolution in
+  // range — never rendered as zero, which would be a real (very fast)
+  // resolution time instead of "no data".
+  average_seconds: number | null;
+}
+
+export interface StatusCount {
+  status: BugStatus;
+  count: number;
+}
+
+export interface SeverityCount {
+  severity: BugSeverity;
+  count: number;
+}
+
+export interface Distributions {
+  status: StatusCount[];
+  severity: SeverityCount[];
+}
+
+export interface WorkloadEntry {
+  user_id: string;
+  name: string;
+  role: CommunityRole;
+  count: number;
+}
+
+export interface Workload {
+  eligible: WorkloadEntry[];
+  unassigned: number;
+  // Bugs whose assignee's *current* role is no longer eligible for
+  // assignment (demoted, not removed — a removed member's bugs are
+  // cleared to unassigned automatically). Never merged into `eligible` or
+  // `unassigned`: hiding these would let a bug silently disappear from
+  // every workload view.
+  needs_reassignment: WorkloadEntry[];
+}
+
+export interface ActiveProject {
+  id: string;
+  key: string;
+  name: string;
+  status: ProjectStatus;
+  total_bugs: number;
+  open_bugs: number;
+}
+
+export interface DashboardActivityBugRef {
+  id: string;
+  key: string;
+  title: string;
+}
+
+// Cross-bug activity feed row — deliberately omits raw `metadata` (unlike
+// BugActivity above, which is scoped to one bug's own detail page).
+export interface DashboardActivity {
+  id: string;
+  bug: DashboardActivityBugRef;
+  project: ProjectRef;
+  actor: User | null;
+  verb: string;
+  from_value: string;
+  to_value: string;
+  created_at: string;
+}

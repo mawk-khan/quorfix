@@ -58,6 +58,12 @@ class BugActivity(UUIDPrimaryKeyModel):
     class Meta:
         indexes = [
             models.Index(fields=["organization", "bug", "-created_at"]),
+            # Organization-wide recent-activity queries (the analytics
+            # dashboard feed) filter by organization alone and order by
+            # -created_at without a bug= filter — the index above can't
+            # serve that ORDER BY since `bug` sits between the two columns
+            # it would need to be adjacent for.
+            models.Index(fields=["organization", "-created_at"]),
         ]
         ordering = ["-created_at", "-id"]
 

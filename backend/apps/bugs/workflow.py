@@ -25,6 +25,13 @@ RESOLUTION_STATUSES = frozenset(
     {BugStatus.RESOLVED, BugStatus.DUPLICATE, BugStatus.CANNOT_REPRODUCE, BugStatus.WONT_FIX}
 )
 
+# Shared bug-lifecycle vocabulary for anything that needs "is this bug still
+# active work" (currently: apps.analytics dashboard queries). CLOSED is
+# terminal but is not a RESOLUTION_STATUS — it's a further step downstream of
+# resolution, not resolution work itself (see apply_timestamp_side_effects).
+TERMINAL_STATUSES = RESOLUTION_STATUSES | {BugStatus.CLOSED}
+OPEN_STATUSES = frozenset(BugStatus.values) - TERMINAL_STATUSES
+
 # Entering ASSIGNED or IN_PROGRESS from anywhere requires the bug to end up
 # with a non-null assignee (either already set, or supplied atomically in
 # the same transition request) — covers both "new -> assigned" and

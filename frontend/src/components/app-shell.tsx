@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 
+import { logout } from "@/lib/api/auth";
 import { useSession } from "@/lib/auth/session-provider";
 
 import { NotificationBell } from "./notification-bell";
@@ -19,7 +20,14 @@ function isPublicRoute(pathname: string): boolean {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { session } = useSession();
+  const router = useRouter();
+  const { session, refetch } = useSession();
+
+  const handleSignOut = async () => {
+    await logout();
+    refetch();
+    router.push("/sign-in");
+  };
 
   // Gated on the session provider's resolved `authenticated` flag, not on
   // whether a session cookie merely exists — a present-but-expired/invalid
@@ -40,7 +48,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 sm:px-8"
         >
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <Link href="/bugs" className="font-semibold">
+            <Link href="/" className="font-semibold">
               Bug Fixer
             </Link>
             <ul className="flex flex-wrap items-center gap-4 text-sm">
@@ -58,7 +66,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               </li>
             </ul>
           </div>
-          <NotificationBell />
+          <div className="flex items-center gap-4">
+            {session?.user && session.organization && (
+              <p className="hidden text-sm text-gray-500 sm:block">
+                Signed in as {session.user.email} ({session.role}) — {session.organization.name}
+              </p>
+            )}
+            <NotificationBell />
+            <button type="button" onClick={handleSignOut} className="text-sm underline">
+              Sign out
+            </button>
+          </div>
         </nav>
       </header>
       {/* Not <main> — every page already renders its own <main> landmark;

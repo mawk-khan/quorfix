@@ -112,21 +112,24 @@ class TestDemoBugs:
             )
         )
 
-        assert 10 <= len(bugs) <= 15
+        assert len(bugs) == 24
 
         statuses = {b.status for b in bugs}
-        assert len(statuses) >= 5  # meaningfully spread across the workflow, not all "new"
+        assert len(statuses) >= 10  # meaningfully spread across the workflow, not all "new"
 
         priorities = {b.priority for b in bugs}
         severities = {b.severity for b in bugs}
-        assert len(priorities) >= 3
-        assert len(severities) >= 3
+        assert priorities == {"urgent", "high", "medium", "low"}
+        assert severities == {"blocker", "critical", "major", "minor", "trivial"}
 
         projects_touched = {b.project.key for b in bugs}
         assert projects_touched == {"BFW", "MOB", "API"}
 
         assignees = {b.assignee.email for b in bugs if b.assignee is not None}
-        assert len(assignees) >= 2
+        assert len(assignees) >= 3  # developer, qa, and admin all carry workload
+
+        unassigned = [b for b in bugs if b.assignee is None]
+        assert len(unassigned) >= 3
 
     def test_uses_the_real_create_bug_service_numbering(self):
         run_seed_demo()
@@ -158,6 +161,66 @@ class TestDemoBugs:
         assert BugRelationship.objects.filter(
             from_bug=duplicate, to_bug=target, relationship_type=RelationshipType.DUPLICATE_OF
         ).exists()
+
+    def test_bugs_are_backdated_across_roughly_the_last_45_days(self):
+        run_seed_demo()
+
+        organization = Organization.objects.get(slug="bug-fixer-demo")
+        bugs = Bug.objects.filter(organization=organization)
+
+        ages_in_days = [(timezone.now() - b.created_at).days for b in bugs]
+        assert min(ages_in_days) <= 2  # something recent
+        assert max(ages_in_days) >= 35  # something well in the past
+        # Not every bug landed on the same day — a real spread, not a single
+        # backdated cluster.
+        assert len({b.created_at.date() for b in bugs}) >= 10
+
+    def test_has_at_least_one_overdue_bug(self):
+        run_seed_demo()
+
+        organization = Organization.objects.get(slug="bug-fixer-demo")
+        from apps.bugs.workflow import OPEN_STATUSES
+
+        overdue = Bug.objects.filter(
+            organization=organization,
+            status__in=OPEN_STATUSES,
+            due_date__lt=timezone.localdate(),
+        )
+        assert overdue.exists()
+
+    def test_has_a_bug_with_reopened_history(self):
+        run_seed_demo()
+
+        organization = Organization.objects.get(slug="bug-fixer-demo")
+        from apps.activities.models import ActivityVerb
+
+        reopened_bug_ids = Bug.objects.filter(
+            organization=organization,
+            activities__verb=ActivityVerb.STATUS_CHANGED,
+            activities__to_value=BugStatus.REOPENED,
+        ).values_list("id", flat=True)
+        assert reopened_bug_ids.exists()
+
+    def test_resolved_bugs_have_a_backdated_resolution_activity(self):
+        run_seed_demo()
+
+        organization = Organization.objects.get(slug="bug-fixer-demo")
+        bug = Bug.objects.get(
+            organization=organization,
+            title="Password reset email arrives several minutes late",
+        )
+        assert bug.status == BugStatus.RESOLVED
+        assert bug.resolved_at is not None
+        assert bug.resolved_at < bug.created_at + timezone.timedelta(days=13)
+
+        from apps.activities.models import ActivityVerb, BugActivity
+
+        resolved_activity = BugActivity.objects.get(
+            bug=bug, verb=ActivityVerb.STATUS_CHANGED, to_value=BugStatus.RESOLVED
+        )
+        # The activity timestamp and the field must agree — resolved_at is
+        # not left at "now" while the activity is backdated, or vice versa.
+        assert abs((resolved_activity.created_at - bug.resolved_at).total_seconds()) < 5
 
     def test_repeated_seeding_does_not_duplicate_bugs_or_disturb_numbering(self):
         run_seed_demo()

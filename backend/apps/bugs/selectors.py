@@ -1,32 +1,10 @@
-from django.db.models import Case, Exists, IntegerField, OuterRef, Q, QuerySet, Value, When
+from django.db.models import Exists, OuterRef, Q, QuerySet
 
-from apps.bugs.models import Bug, BugPriority, BugRelationship, BugSeverity, Tag
+from apps.bugs.models import Bug, BugRelationship, Tag
+from apps.bugs.ordering import PRIORITY_RANK, SEVERITY_RANK, rank_case
 from apps.organizations.models import OrganizationMembership
 
-# Explicit business ordering, not alphabetical — "urgent" must sort above
-# "low", "blocker" above "trivial", regardless of enum declaration order.
-_PRIORITY_RANK = {
-    BugPriority.LOW: 0,
-    BugPriority.MEDIUM: 1,
-    BugPriority.HIGH: 2,
-    BugPriority.URGENT: 3,
-}
-_SEVERITY_RANK = {
-    BugSeverity.TRIVIAL: 0,
-    BugSeverity.MINOR: 1,
-    BugSeverity.MAJOR: 2,
-    BugSeverity.CRITICAL: 3,
-    BugSeverity.BLOCKER: 4,
-}
-
 SORT_FIELDS = frozenset({"created_at", "updated_at", "due_date", "number", "priority", "severity"})
-
-
-def _rank_case(field: str, rank_map: dict) -> Case:
-    return Case(
-        *[When(**{field: value}, then=Value(rank)) for value, rank in rank_map.items()],
-        output_field=IntegerField(),
-    )
 
 
 def get_bugs_for_organization(organization) -> QuerySet[Bug]:
@@ -149,10 +127,10 @@ def _apply_ordering(qs: QuerySet[Bug], ordering: str) -> QuerySet[Bug]:
     field = ordering[1:] if descending else ordering
 
     if field == "priority":
-        qs = qs.annotate(_priority_rank=_rank_case("priority", _PRIORITY_RANK))
+        qs = qs.annotate(_priority_rank=rank_case("priority", PRIORITY_RANK))
         return qs.order_by("-_priority_rank" if descending else "_priority_rank", "-created_at")
     if field == "severity":
-        qs = qs.annotate(_severity_rank=_rank_case("severity", _SEVERITY_RANK))
+        qs = qs.annotate(_severity_rank=rank_case("severity", SEVERITY_RANK))
         return qs.order_by("-_severity_rank" if descending else "_severity_rank", "-created_at")
     return qs.order_by(ordering, "-id")
 

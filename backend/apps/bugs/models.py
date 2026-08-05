@@ -133,6 +133,7 @@ class Bug(OrganizationScopedModel):
             models.Index(fields=["organization", "priority"]),
             models.Index(fields=["organization", "severity"]),
             models.Index(fields=["organization", "due_date"]),
+            models.Index(fields=["organization", "resolved_at"]),
         ]
 
     def __str__(self) -> str:

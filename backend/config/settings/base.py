@@ -167,6 +167,11 @@ ATTACHMENTS_LOCAL_ROOT = os.environ.get("ATTACHMENTS_LOCAL_ROOT", str(BASE_DIR /
 # Email (invitations). Backend and SMTP credentials are set per-environment.
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 
+# Analytics dashboard. Short-TTL only (see apps.analytics.caching) — no
+# event-driven invalidation. A Redis outage falls back to direct queries
+# rather than failing the dashboard.
+ANALYTICS_CACHE_TTL_SECONDS = int(os.environ.get("ANALYTICS_CACHE_TTL_SECONDS", "60"))
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Bug Fixer API",
     "DESCRIPTION": "Bug Fixer Community REST API",
