@@ -193,3 +193,24 @@ def make_bug(db):
 @pytest.fixture
 def bug(organization, project, admin_user, admin_membership, make_bug):
     return make_bug(organization, project, admin_user, membership=admin_membership)
+
+
+@pytest.fixture
+def make_comment(db):
+    """Goes through the real apps.comments.services.create_comment — not a bare
+    Comment.objects.create — so every fixture-created comment exercises the
+    same validation/activity/mention path production traffic does."""
+    from apps.comments.services import create_comment
+    from apps.organizations.selectors import get_membership_for_user
+
+    def _make(bug, author, membership=None, body="Looks like a real bug."):
+        if membership is None:
+            membership = get_membership_for_user(author)
+        return create_comment(bug=bug, author=author, membership=membership, body=body)
+
+    return _make
+
+
+@pytest.fixture
+def comment(bug, admin_user, admin_membership, make_comment):
+    return make_comment(bug, admin_user, membership=admin_membership)

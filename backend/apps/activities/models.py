@@ -18,6 +18,11 @@ class ActivityVerb(models.TextChoices):
     RELATIONSHIP_REMOVED = "relationship_removed", "Relationship removed"
     ARCHIVED = "archived", "Archived"
     RESTORED = "restored", "Restored"
+    COMMENT_ADDED = "comment_added", "Comment added"
+    COMMENT_EDITED = "comment_edited", "Comment edited"
+    COMMENT_DELETED = "comment_deleted", "Comment deleted"
+    COMMENT_REDACTED = "comment_redacted", "Comment redacted"
+    MENTION_CREATED = "mention_created", "Mention created"
 
 
 class BugActivity(UUIDPrimaryKeyModel):

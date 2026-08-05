@@ -147,6 +147,10 @@ REST_FRAMEWORK = {
 INVITATION_EXPIRY_DAYS = 7
 FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:3000")
 
+# Comments: how long after posting an author may still edit/delete their own
+# comment. Administrators are not bound by this window.
+COMMENT_EDIT_WINDOW_MINUTES = 15
+
 # Email (invitations). Backend and SMTP credentials are set per-environment.
 DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 
