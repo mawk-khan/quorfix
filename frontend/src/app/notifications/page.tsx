@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+import { AccessState } from "@/components/access-state";
 import { ApiError } from "@/lib/api/client";
 import {
   listNotifications,
@@ -36,7 +37,7 @@ export default function NotificationsPage() {
     // wrapped in Suspense — matches app/bugs/page.tsx and app/projects/page.tsx.
     <Suspense
       fallback={
-        <main className="p-8">
+        <main id="main-content" tabIndex={-1} className="p-8">
           <p>Loading notifications…</p>
         </main>
       }
@@ -113,7 +114,7 @@ function NotificationsPageContent() {
 
   if (sessionLoading) {
     return (
-      <main className="p-8">
+      <main id="main-content" tabIndex={-1} className="p-8">
         <p>Loading…</p>
       </main>
     );
@@ -121,8 +122,12 @@ function NotificationsPageContent() {
 
   if (!session?.authenticated) {
     return (
-      <main className="p-8">
-        <p role="alert">You must sign in to view this page.</p>
+      <main id="main-content" tabIndex={-1} className="p-8">
+        <AccessState
+          heading="Sign in required"
+          message="You must sign in to view this page."
+          action={{ href: "/sign-in", label: "Go to sign in" }}
+        />
       </main>
     );
   }
@@ -130,7 +135,7 @@ function NotificationsPageContent() {
   const notifications = notificationsQuery.data?.results ?? [];
 
   return (
-    <main className="mx-auto max-w-3xl space-y-6 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl space-y-6 p-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Notifications</h1>
         <div className="flex items-center gap-3">

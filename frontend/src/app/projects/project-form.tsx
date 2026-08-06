@@ -3,6 +3,7 @@
 import type { FieldErrors, Path, UseFormRegister } from "react-hook-form";
 
 import type { Membership } from "@/lib/api/types";
+import { errorProps } from "@/lib/forms/error-props";
 import { PROJECT_STATUSES } from "@/lib/validation/projects";
 
 interface ProjectFormFields {
@@ -45,10 +46,11 @@ export function ProjectForm<T extends ProjectFormFields>({
         <input
           id="project-name"
           className="mt-1 w-full rounded border px-3 py-2"
+          {...errorProps("project-name", errors.name)}
           {...register("name" as Path<T>)}
         />
         {errors.name && (
-          <p role="alert" className="mt-1 text-sm text-red-700">
+          <p id="project-name-error" role="alert" className="mt-1 text-sm text-red-700">
             {errors.name.message as string}
           </p>
         )}
@@ -62,10 +64,11 @@ export function ProjectForm<T extends ProjectFormFields>({
           <input
             id="project-key"
             className="mt-1 w-full rounded border px-3 py-2 font-mono uppercase"
+            {...errorProps("project-key", errors.key)}
             {...register("key" as Path<T>)}
           />
           {errors.key && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="project-key-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.key.message as string}
             </p>
           )}

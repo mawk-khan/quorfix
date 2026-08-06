@@ -165,6 +165,16 @@ export function MentionTextarea({
         role="combobox"
         className="w-full rounded border px-3 py-2"
       />
+      {/* Announces the suggestion count as it changes while composing an
+          "@" mention — separate from the listbox itself, since a listbox's
+          own option count isn't announced by every screen reader on every
+          keystroke. Text only changes (so only announces) when the count
+          itself changes, not on every re-render. */}
+      <p aria-live="polite" className="sr-only">
+        {open
+          ? `${suggestions.length} mention suggestion${suggestions.length === 1 ? "" : "s"} available.`
+          : ""}
+      </p>
       {open && (
         <ul
           id={listboxId}

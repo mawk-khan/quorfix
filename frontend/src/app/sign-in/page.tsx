@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { login } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-provider";
+import { errorProps } from "@/lib/forms/error-props";
 import { loginSchema, type LoginFormValues } from "@/lib/validation/auth";
 
 export default function SignInPage() {
@@ -37,7 +38,7 @@ export default function SignInPage() {
   };
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-8">
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="w-full max-w-sm space-y-4"
@@ -54,10 +55,11 @@ export default function SignInPage() {
             type="email"
             autoComplete="email"
             className="mt-1 w-full rounded border px-3 py-2"
+            {...errorProps("email", errors.email)}
             {...register("email")}
           />
           {errors.email && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="email-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.email.message}
             </p>
           )}
@@ -72,10 +74,11 @@ export default function SignInPage() {
             type="password"
             autoComplete="current-password"
             className="mt-1 w-full rounded border px-3 py-2"
+            {...errorProps("password", errors.password)}
             {...register("password")}
           />
           {errors.password && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="password-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.password.message}
             </p>
           )}

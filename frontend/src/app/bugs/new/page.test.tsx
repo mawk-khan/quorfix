@@ -58,7 +58,8 @@ describe("NewBugPage", () => {
     vi.mocked(listProjects).mockResolvedValueOnce(paginated([projectFixture]));
     renderWithProviders(<NewBugPage />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/do not have permission/i);
+    expect(await screen.findByRole("heading", { name: /access restricted/i })).toBeInTheDocument();
+    expect(screen.getByText(/do not have permission to create bugs/i)).toBeInTheDocument();
   });
 
   it("allows a reporter to reach the form", async () => {

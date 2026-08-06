@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { ApiError } from "@/lib/api/client";
 import { getSetupStatus, submitSetup } from "@/lib/api/setup";
 import { useSession } from "@/lib/auth/session-provider";
+import { errorProps } from "@/lib/forms/error-props";
 import { setupSchema, type SetupFormValues } from "@/lib/validation/setup";
 
 export default function SetupPage() {
@@ -51,14 +52,14 @@ export default function SetupPage() {
 
   if (checking) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-8">
         <p>Checking instance status…</p>
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-8">
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="w-full max-w-sm space-y-4"
@@ -76,10 +77,11 @@ export default function SetupPage() {
           <input
             id="organization_name"
             className="mt-1 w-full rounded border px-3 py-2"
+            {...errorProps("organization_name", errors.organization_name)}
             {...register("organization_name")}
           />
           {errors.organization_name && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="organization_name-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.organization_name.message}
             </p>
           )}
@@ -94,10 +96,11 @@ export default function SetupPage() {
             type="email"
             autoComplete="email"
             className="mt-1 w-full rounded border px-3 py-2"
+            {...errorProps("email", errors.email)}
             {...register("email")}
           />
           {errors.email && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="email-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.email.message}
             </p>
           )}
@@ -112,10 +115,11 @@ export default function SetupPage() {
             type="password"
             autoComplete="new-password"
             className="mt-1 w-full rounded border px-3 py-2"
+            {...errorProps("password", errors.password)}
             {...register("password")}
           />
           {errors.password && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="password-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.password.message}
             </p>
           )}

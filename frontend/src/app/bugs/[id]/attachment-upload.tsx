@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { ApiError } from "@/lib/api/client";
 import {
@@ -61,6 +61,7 @@ export interface AttachmentUploadProps {
 
 export function AttachmentUpload({ bugId, disabled, disabledReason, persistedAttachmentIds }: AttachmentUploadProps) {
   const queryClient = useQueryClient();
+  const acceptedTypesId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const nextLocalId = useRef(0);
   const [rows, setRows] = useState<UploadRow[]>([]);
@@ -172,12 +173,15 @@ export function AttachmentUpload({ bugId, disabled, disabledReason, persistedAtt
           type="file"
           className="sr-only"
           aria-label="Upload attachment"
+          aria-describedby={acceptedTypesId}
           onChange={(event) => {
             enqueueFiles(event.target.files);
             event.target.value = "";
           }}
         />
-        <p className="mt-1 text-xs text-gray-500">Images, PDF, text/CSV, JSON, ZIP, MP4, Word/Excel. Max 10 MB. SVG is not accepted.</p>
+        <p id={acceptedTypesId} className="mt-1 text-xs text-gray-500">
+          Images, PDF, text/CSV, JSON, ZIP, MP4, Word/Excel. Max 10 MB. SVG is not accepted.
+        </p>
       </div>
 
       {visibleRows.length > 0 && (
@@ -187,11 +191,22 @@ export function AttachmentUpload({ bugId, disabled, disabledReason, persistedAtt
               <span className="flex-1 truncate">{row.file.name}</span>
               <span className="text-xs text-gray-500">{formatFileSize(row.file.size)}</span>
               {row.status === "uploading" && (
-                <span className="text-xs text-gray-500" aria-live="polite">
+                <span
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={Math.round(row.progress * 100)}
+                  aria-label={`Uploading ${row.file.name}`}
+                  className="text-xs text-gray-500"
+                >
                   Uploading… {Math.round(row.progress * 100)}%
                 </span>
               )}
-              {row.status === "success" && <span className="text-xs text-green-700">Uploaded</span>}
+              {row.status === "success" && (
+                <span role="status" className="text-xs text-green-700">
+                  Uploaded
+                </span>
+              )}
               {row.status === "failed" && (
                 <>
                   <span role="alert" className="text-xs text-red-700">

@@ -6,10 +6,12 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { AccessState } from "@/components/access-state";
 import { createBug } from "@/lib/api/bugs";
 import { ApiError } from "@/lib/api/client";
 import { listProjects } from "@/lib/api/projects";
 import { useSession } from "@/lib/auth/session-provider";
+import { errorProps } from "@/lib/forms/error-props";
 import { BUG_PRIORITIES, BUG_SEVERITIES, createBugSchema, type CreateBugFormValues } from "@/lib/validation/bugs";
 
 function describeError(error: unknown): string {
@@ -68,7 +70,7 @@ export default function NewBugPage() {
 
   if (sessionLoading) {
     return (
-      <main className="p-8">
+      <main id="main-content" tabIndex={-1} className="p-8">
         <p>Loading…</p>
       </main>
     );
@@ -76,16 +78,20 @@ export default function NewBugPage() {
 
   if (!session?.authenticated) {
     return (
-      <main className="p-8">
-        <p role="alert">You must sign in to view this page.</p>
+      <main id="main-content" tabIndex={-1} className="p-8">
+        <AccessState
+          heading="Sign in required"
+          message="You must sign in to view this page."
+          action={{ href: "/sign-in", label: "Go to sign in" }}
+        />
       </main>
     );
   }
 
   if (!canCreate) {
     return (
-      <main className="p-8">
-        <p role="alert">You do not have permission to create bugs.</p>
+      <main id="main-content" tabIndex={-1} className="p-8">
+        <AccessState heading="Access restricted" message="You do not have permission to create bugs." />
       </main>
     );
   }
@@ -93,7 +99,7 @@ export default function NewBugPage() {
   const projects = projectsQuery.data?.results ?? [];
 
   return (
-    <main className="mx-auto max-w-xl space-y-6 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl space-y-6 p-8">
       <h1 className="text-xl font-semibold">New bug</h1>
 
       {submitError && (
@@ -111,7 +117,12 @@ export default function NewBugPage() {
           <label htmlFor="bug-project" className="block text-sm font-medium">
             Project
           </label>
-          <select id="bug-project" className="mt-1 w-full rounded border px-2 py-2" {...register("project")}>
+          <select
+            id="bug-project"
+            className="mt-1 w-full rounded border px-2 py-2"
+            {...errorProps("bug-project", errors.project)}
+            {...register("project")}
+          >
             <option value="">Select a project…</option>
             {projects.map((project) => (
               <option key={project.id} value={project.id}>
@@ -120,7 +131,7 @@ export default function NewBugPage() {
             ))}
           </select>
           {errors.project && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="bug-project-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.project.message}
             </p>
           )}
@@ -130,9 +141,14 @@ export default function NewBugPage() {
           <label htmlFor="bug-title" className="block text-sm font-medium">
             Title
           </label>
-          <input id="bug-title" className="mt-1 w-full rounded border px-3 py-2" {...register("title")} />
+          <input
+            id="bug-title"
+            className="mt-1 w-full rounded border px-3 py-2"
+            {...errorProps("bug-title", errors.title)}
+            {...register("title")}
+          />
           {errors.title && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="bug-title-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.title.message}
             </p>
           )}

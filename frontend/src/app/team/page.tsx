@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
+import { AccessState } from "@/components/access-state";
 import { ApiError } from "@/lib/api/client";
 import { cancelInvitation, createInvitation, listInvitations } from "@/lib/api/invitations";
 import { listMembers, removeMember, updateMemberRole } from "@/lib/api/members";
@@ -73,7 +74,7 @@ export default function TeamPage() {
 
   if (sessionLoading || membersQuery.isLoading) {
     return (
-      <main className="p-8">
+      <main id="main-content" tabIndex={-1} className="p-8">
         <p>Loading team…</p>
       </main>
     );
@@ -81,14 +82,18 @@ export default function TeamPage() {
 
   if (!session?.authenticated) {
     return (
-      <main className="p-8">
-        <p role="alert">You must sign in to view this page.</p>
+      <main id="main-content" tabIndex={-1} className="p-8">
+        <AccessState
+          heading="Sign in required"
+          message="You must sign in to view this page."
+          action={{ href: "/sign-in", label: "Go to sign in" }}
+        />
       </main>
     );
   }
 
   return (
-    <main className="mx-auto max-w-3xl space-y-8 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl space-y-8 p-8">
       <h1 className="text-xl font-semibold">Team</h1>
 
       {actionError && (

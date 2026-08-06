@@ -26,6 +26,7 @@ export function ProjectTable({ projects, hasActiveFilters }: ProjectTableProps) 
 
   return (
     <table className="mt-2 w-full text-left text-sm">
+      <caption className="sr-only">Projects</caption>
       <thead>
         <tr>
           <th scope="col" className="pb-2">

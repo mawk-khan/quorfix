@@ -39,7 +39,7 @@ export function DeveloperWorkload({ query }: DeveloperWorkloadProps) {
     >
       {(workload) => (
         <>
-          <p className="mb-2 text-xs text-gray-400">
+          <p className="mb-2 text-xs text-gray-500">
             Current open workload — not affected by the date range
           </p>
           <table className="w-full text-sm">

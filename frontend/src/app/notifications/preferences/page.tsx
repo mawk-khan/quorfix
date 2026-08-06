@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
+import { AccessState } from "@/components/access-state";
 import { ApiError } from "@/lib/api/client";
 import { listNotificationPreferences, notificationKeys, updateNotificationPreference } from "@/lib/api/notifications";
 import type { NotificationEventType } from "@/lib/api/types";
@@ -46,7 +47,7 @@ export default function NotificationPreferencesPage() {
 
   if (sessionLoading || preferencesQuery.isLoading) {
     return (
-      <main className="p-8">
+      <main id="main-content" tabIndex={-1} className="p-8">
         <p>Loading…</p>
       </main>
     );
@@ -54,15 +55,19 @@ export default function NotificationPreferencesPage() {
 
   if (!session?.authenticated) {
     return (
-      <main className="p-8">
-        <p role="alert">You must sign in to view this page.</p>
+      <main id="main-content" tabIndex={-1} className="p-8">
+        <AccessState
+          heading="Sign in required"
+          message="You must sign in to view this page."
+          action={{ href: "/sign-in", label: "Go to sign in" }}
+        />
       </main>
     );
   }
 
   if (preferencesQuery.isError) {
     return (
-      <main className="p-8">
+      <main id="main-content" tabIndex={-1} className="p-8">
         <p role="alert" className="text-sm text-red-700">
           {describeError(preferencesQuery.error)}
         </p>
@@ -71,7 +76,7 @@ export default function NotificationPreferencesPage() {
   }
 
   return (
-    <main className="mx-auto max-w-2xl space-y-6 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6 p-8">
       <div>
         <Link href="/notifications" className="text-sm text-blue-700 underline">
           ← Back to notifications

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+import { AccessState } from "@/components/access-state";
 import { listBugs } from "@/lib/api/bugs";
 import { ApiError } from "@/lib/api/client";
 import { listProjects } from "@/lib/api/projects";
@@ -32,7 +33,7 @@ export default function BugsPage() {
     // wrapped in Suspense — matches the pattern in app/projects/page.tsx.
     <Suspense
       fallback={
-        <main className="p-8">
+        <main id="main-content" tabIndex={-1} className="p-8">
           <p>Loading bugs…</p>
         </main>
       }
@@ -126,7 +127,7 @@ function BugsPageContent() {
 
   if (sessionLoading) {
     return (
-      <main className="p-8">
+      <main id="main-content" tabIndex={-1} className="p-8">
         <p>Loading…</p>
       </main>
     );
@@ -134,8 +135,12 @@ function BugsPageContent() {
 
   if (!session?.authenticated) {
     return (
-      <main className="p-8">
-        <p role="alert">You must sign in to view this page.</p>
+      <main id="main-content" tabIndex={-1} className="p-8">
+        <AccessState
+          heading="Sign in required"
+          message="You must sign in to view this page."
+          action={{ href: "/sign-in", label: "Go to sign in" }}
+        />
       </main>
     );
   }
@@ -150,7 +155,7 @@ function BugsPageContent() {
     filters.unassigned;
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-5xl space-y-6 p-8">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-semibold">Bugs</h1>
         {canCreate && (

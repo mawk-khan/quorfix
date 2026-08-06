@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import {
   getUnreadCount,
@@ -25,6 +25,7 @@ export function NotificationBell() {
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const panelId = useId();
 
   // Both queries key off notificationKeys — the same keys the /notifications
   // and /notifications/preferences pages use, so mutations anywhere
@@ -104,6 +105,7 @@ export function NotificationBell() {
         type="button"
         aria-haspopup="true"
         aria-expanded={open}
+        aria-controls={open ? panelId : undefined}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
         onClick={() => setOpen((value) => !value)}
         className="relative rounded border px-3 py-1.5 text-sm"
@@ -121,6 +123,8 @@ export function NotificationBell() {
 
       {open && (
         <div
+          id={panelId}
+          role="region"
           aria-label="Recent notifications"
           className="absolute right-0 z-10 mt-2 w-80 rounded border bg-white shadow-lg"
         >

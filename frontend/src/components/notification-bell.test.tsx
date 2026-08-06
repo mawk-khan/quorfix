@@ -146,6 +146,19 @@ describe("NotificationBell", () => {
     await waitFor(() => expect(markAllNotificationsRead).toHaveBeenCalled());
   });
 
+  it("links the trigger to the open panel via aria-controls", async () => {
+    vi.mocked(getUnreadCount).mockResolvedValue({ count: 0 });
+    vi.mocked(listNotifications).mockResolvedValue(paginated([]));
+    renderWithProviders(<NotificationBell />);
+
+    const trigger = await screen.findByRole("button", { name: /^notifications$/i });
+    expect(trigger).not.toHaveAttribute("aria-controls");
+
+    await userEvent.setup().click(trigger);
+    const panel = await screen.findByLabelText(/recent notifications/i);
+    expect(panel).toHaveAttribute("id", trigger.getAttribute("aria-controls"));
+  });
+
   it("closes on Escape and returns focus to the trigger button", async () => {
     vi.mocked(getUnreadCount).mockResolvedValue({ count: 0 });
     vi.mocked(listNotifications).mockResolvedValue(paginated([]));

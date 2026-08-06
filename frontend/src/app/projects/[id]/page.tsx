@@ -3,9 +3,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { AccessState } from "@/components/access-state";
+import { AlertDialog } from "@/components/alert-dialog";
 import { ApiError } from "@/lib/api/client";
 import { listMembers } from "@/lib/api/members";
 import { archiveProject, getProject, restoreProject, updateProject } from "@/lib/api/projects";
@@ -37,6 +39,7 @@ export default function ProjectDetailPage() {
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [confirmingArchive, setConfirmingArchive] = useState(false);
+  const archiveButtonRef = useRef<HTMLButtonElement>(null);
 
   const projectQuery = useQuery({
     queryKey: ["projects", "detail", id],
@@ -111,7 +114,7 @@ export default function ProjectDetailPage() {
 
   if (sessionLoading || projectQuery.isLoading) {
     return (
-      <main className="p-8">
+      <main id="main-content" tabIndex={-1} className="p-8">
         <p>Loading…</p>
       </main>
     );
@@ -119,8 +122,12 @@ export default function ProjectDetailPage() {
 
   if (!session?.authenticated) {
     return (
-      <main className="p-8">
-        <p role="alert">You must sign in to view this page.</p>
+      <main id="main-content" tabIndex={-1} className="p-8">
+        <AccessState
+          heading="Sign in required"
+          message="You must sign in to view this page."
+          action={{ href: "/sign-in", label: "Go to sign in" }}
+        />
       </main>
     );
   }
@@ -128,12 +135,16 @@ export default function ProjectDetailPage() {
   if (projectQuery.isError || !projectQuery.data) {
     const notFound = projectQuery.error instanceof ApiError && projectQuery.error.status === 404;
     return (
-      <main className="p-8">
-        <p role="alert">
-          {notFound
-            ? "This project does not exist or you don't have access to it."
-            : "Something went wrong loading this project."}
-        </p>
+      <main id="main-content" tabIndex={-1} className="p-8">
+        <AccessState
+          heading={notFound ? "Not found" : "Something went wrong"}
+          message={
+            notFound
+              ? "This project does not exist or you don't have access to it."
+              : "Something went wrong loading this project."
+          }
+          action={{ href: "/projects", label: "Back to projects" }}
+        />
       </main>
     );
   }
@@ -142,7 +153,7 @@ export default function ProjectDetailPage() {
   const isArchived = project.archived_at !== null;
 
   return (
-    <main className="mx-auto max-w-xl space-y-6 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl space-y-6 p-8">
       <div>
         <p className="font-mono text-sm text-gray-500">{project.key}</p>
         <h1 className="text-xl font-semibold">{project.name}</h1>
@@ -197,10 +208,16 @@ export default function ProjectDetailPage() {
             members={membersQuery.data ?? []}
             submitLabel="Save changes"
           />
+          {updateMutation.isSuccess && (
+            <span role="status" className="text-sm text-gray-500">
+              Saved.
+            </span>
+          )}
 
           <div className="border-t pt-4">
             {!confirmingArchive ? (
               <button
+                ref={archiveButtonRef}
                 type="button"
                 onClick={() => setConfirmingArchive(true)}
                 className="text-sm text-red-700 underline"
@@ -208,20 +225,16 @@ export default function ProjectDetailPage() {
                 Archive project
               </button>
             ) : (
-              <div className="flex items-center gap-3 text-sm">
-                <span>Archive this project?</span>
-                <button
-                  type="button"
-                  onClick={() => archiveMutation.mutate()}
-                  disabled={archiveMutation.isPending}
-                  className="text-red-700 underline"
-                >
-                  Confirm
-                </button>
-                <button type="button" onClick={() => setConfirmingArchive(false)} className="underline">
-                  Cancel
-                </button>
-              </div>
+              <AlertDialog
+                variant="inline"
+                title="Confirm archive project"
+                description="Archive this project?"
+                confirmLabel="Confirm"
+                onConfirm={() => archiveMutation.mutate()}
+                onCancel={() => setConfirmingArchive(false)}
+                pending={archiveMutation.isPending}
+                restoreFocusTo={archiveButtonRef}
+              />
             )}
           </div>
         </>

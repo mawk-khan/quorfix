@@ -100,7 +100,8 @@ describe("BugsPage", () => {
     });
     renderWithProviders(<BugsPage />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/must sign in/i);
+    expect(await screen.findByRole("heading", { name: /sign in required/i })).toBeInTheDocument();
+    expect(screen.getByText(/must sign in to view this page/i)).toBeInTheDocument();
   });
 
   it("shows an empty state when there are no bugs at all", async () => {

@@ -78,6 +78,9 @@ describe("CommentItem", () => {
 
     expect(screen.queryByLabelText(/edit comment/i)).not.toBeInTheDocument();
     expect(screen.getByText("Looks good to me.")).toBeInTheDocument();
+    // The MentionTextarea unmounted along with the rest of edit mode —
+    // focus must land back on the Edit button, not fall through to body.
+    expect(screen.getByRole("button", { name: /^edit$/i })).toHaveFocus();
   });
 
   it("submits an edit and calls onMutated with the server response", async () => {
@@ -99,6 +102,7 @@ describe("CommentItem", () => {
 
     await waitFor(() => expect(updateComment).toHaveBeenCalledWith("b1", "c1", "Updated body"));
     await waitFor(() => expect(onMutated).toHaveBeenCalledWith(updated));
+    expect(screen.getByRole("button", { name: /^edit$/i })).toHaveFocus();
   });
 
   it("on a 409 edit-window-expired error, shows the backend message, closes the edit form, and refreshes stale state", async () => {

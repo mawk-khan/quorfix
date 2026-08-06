@@ -40,7 +40,12 @@ export function DashboardSection<T>({
       <h2 className="mb-3 text-sm font-semibold text-gray-700">{title}</h2>
 
       {query.isLoading && (
-        <div className="h-32 animate-pulse rounded bg-gray-100" aria-hidden="true" />
+        <>
+          <div className="h-32 animate-pulse rounded bg-gray-100" aria-hidden="true" />
+          <p role="status" className="sr-only">
+            Loading {title}…
+          </p>
+        </>
       )}
 
       {query.isError && (

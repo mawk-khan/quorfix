@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { logout } from "@/lib/api/auth";
 import { useSession } from "@/lib/auth/session-provider";
@@ -23,6 +23,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { session, refetch } = useSession();
 
+  // Next's App Router doesn't move focus on client-side navigation the way
+  // a full page load moves it to the document — without this, focus stays
+  // on whatever link/button was just clicked, on a now-unmounted or
+  // unrelated part of the new page. Moving it to the new page's own <main
+  // id="main-content"> (every page renders one) puts a screen reader user
+  // at the start of the new page's actual content, the same landmark the
+  // skip link above targets. Skipped on first mount — there's nothing to
+  // move focus *from* yet, and stealing it from the URL bar on initial load
+  // would be actively wrong.
+  const previousPathname = useRef(pathname);
+  useEffect(() => {
+    if (previousPathname.current === pathname) return;
+    previousPathname.current = pathname;
+    document.getElementById("main-content")?.focus();
+  }, [pathname]);
+
   const handleSignOut = async () => {
     await logout();
     refetch();
@@ -40,8 +56,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
+  const navLinks = [
+    { href: "/bugs", label: "Bugs" },
+    { href: "/projects", label: "Projects" },
+    { href: "/team", label: "Team" },
+    { href: "/notifications", label: "Notifications" },
+  ];
+
   return (
     <div className="flex min-h-screen flex-col">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-black focus:shadow-lg focus:outline focus:outline-2 focus:outline-blue-600"
+      >
+        Skip to main content
+      </a>
       <header className="border-b">
         <nav
           aria-label="Primary"
@@ -52,18 +81,20 @@ export function AppShell({ children }: { children: ReactNode }) {
               Bug Fixer
             </Link>
             <ul className="flex flex-wrap items-center gap-4 text-sm">
-              <li>
-                <Link href="/bugs">Bugs</Link>
-              </li>
-              <li>
-                <Link href="/projects">Projects</Link>
-              </li>
-              <li>
-                <Link href="/team">Team</Link>
-              </li>
-              <li>
-                <Link href="/notifications">Notifications</Link>
-              </li>
+              {navLinks.map((link) => {
+                const isCurrent = pathname === link.href || pathname.startsWith(`${link.href}/`);
+                return (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      aria-current={isCurrent ? "page" : undefined}
+                      className={isCurrent ? "font-semibold underline" : undefined}
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                );
+              })}
             </ul>
           </div>
           <div className="flex items-center gap-4">

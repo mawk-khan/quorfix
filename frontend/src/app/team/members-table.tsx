@@ -18,6 +18,7 @@ export function MembersTable({ members, isAdmin, onRoleChange, onRemove }: Membe
 
   return (
     <table className="mt-2 w-full text-left text-sm">
+      <caption className="sr-only">Team members</caption>
       <thead>
         <tr>
           <th scope="col" className="pb-2">

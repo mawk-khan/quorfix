@@ -30,7 +30,7 @@ export function StatusDistributionChart({ query }: StatusDistributionChartProps)
 
         return (
           <div aria-label="Current backlog, distribution of bug statuses — a current snapshot, unaffected by the date filter">
-            <p className="mb-2 text-xs text-gray-400">Current backlog — not affected by the date range</p>
+            <p className="mb-2 text-xs text-gray-500">Current backlog — not affected by the date range</p>
             <ResponsiveContainer width="100%" height={Math.max(240, rows.length * 32)}>
               <BarChart
                 data={rows}

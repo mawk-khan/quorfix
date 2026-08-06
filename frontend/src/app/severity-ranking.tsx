@@ -32,7 +32,7 @@ export function SeverityRanking({ query }: SeverityRankingProps) {
 
         return (
           <div aria-label="Current backlog, ranked from most to least severe — a current snapshot, unaffected by the date filter">
-            <p className="mb-2 text-xs text-gray-400">
+            <p className="mb-2 text-xs text-gray-500">
               Current backlog, ranked blocker to trivial — not affected by the date range
             </p>
             <ResponsiveContainer width="100%" height={Math.max(180, rows.length * 36)}>

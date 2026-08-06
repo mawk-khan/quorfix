@@ -32,7 +32,7 @@ export function SummaryCards({ query }: SummaryCardsProps) {
               >
                 {formatCount(summary[card.key])}
               </p>
-              <p className="mt-1 text-xs text-gray-400">{card.hint}</p>
+              <p className="mt-1 text-xs text-gray-500">{card.hint}</p>
             </div>
           ))}
         </div>

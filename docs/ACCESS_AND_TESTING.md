@@ -490,6 +490,74 @@ affected by the date range", etc.) — the date filter never silently does nothi
   outside what `backend.yml`'s pip-audit step scans; noted here rather than silently dropped.
   No malware/virus scanning of uploaded attachments exists in Community (documented, not new).
 
+### Phase 6 Chunk H: Community accessibility audit and remediation
+- **Status:** Complete
+- **Commit:** _(this change — update once committed)_
+- **Main functionality:** Audited and remediated accessibility across the full Community
+  interface. Added a shared `AlertDialog` primitive (proper `role="alertdialog"`,
+  `aria-modal`, initial focus on Cancel — never the destructive action, a Tab focus trap,
+  Escape-to-close, and focus restored to the triggering button on close) and replaced four
+  duplicated, broken inline confirmation panels with it (comment delete/redact, attachment
+  remove, bug/project archive) — each passes a `restoreFocusTo` ref captured by its own trigger
+  button, rather than `AlertDialog` reading `document.activeElement` itself: every real call
+  site renders the trigger and the dialog as mutually exclusive siblings, so the trigger has
+  already unmounted (and the ref is already `null`) by the time the dialog's own mount effect
+  would run. The Playwright keyboard suite caught this exact bug in the first implementation
+  (`e2e/keyboard-navigation.spec.ts`'s "cancels a destructive dialog..." case) — retained as a
+  standing regression test, alongside a matching component test whose harness unmounts the
+  trigger the same way. Added a "Skip to main content" link and `aria-current="page"`
+  on the primary nav; every page's `<main>` now carries `id="main-content" tabIndex={-1}` and
+  client-side route changes move focus there automatically (Next's App Router does not do this
+  itself). Fixed `NotificationBell`'s dropdown to use `aria-controls`/a real `id` linking
+  trigger to panel. Added `aria-invalid`/`aria-describedby` error association (a new
+  `errorProps()` helper) to every form field with an active validator, across sign-in, setup,
+  invitation-accept, bug create/edit, project create/edit, and team invite. Replaced
+  `role="alert"` on static sign-in-required/not-found/forbidden page states with a new shared
+  `AccessState` component (a real heading + plain text + a next-action link) — those are
+  page-load conditions, not dynamic interruptions, so an assertive announcement on every visit
+  was spurious; genuine dynamic mutation-error alerts were left untouched. Added focus
+  restoration after comment-edit cancel/save (the Edit button, since the textarea unmounts) and
+  a "Saved." status after bug/project content-edit submissions. Converted attachment upload
+  progress to `role="progressbar"` with `aria-valuenow/min/max`, associated the accepted-types
+  hint with the file input via `aria-describedby`, and added an `aria-live` result-count
+  announcement to the mention-suggestion popover. Added `<caption>` to the bugs, projects, and
+  team-member tables. Added `@axe-core/playwright` (dev-only) and
+  `frontend/e2e/accessibility.spec.ts`, scanning sign-in (unauthenticated), dashboard, projects,
+  bugs, bug detail, notifications, and notification preferences — failing on any
+  serious/critical violation with no rules disabled; it caught one real defect (muted caption
+  text, `text-gray-400` on white, at 2.6:1 contrast — fixed to `text-gray-500`, ~4.8:1). Added
+  `frontend/e2e/keyboard-navigation.spec.ts` (keyboard-only sign-in, skip link, bug creation,
+  notification dropdown, and destructive-dialog cancel with focus restoration) and component
+  tests for `AlertDialog`, `AppShell` (skip link, `aria-current`, route-change focus), and the
+  notification dropdown's `aria-controls` wiring. Added a global
+  `prefers-reduced-motion: reduce` rule. Fixed `VisuallyHiddenTable` (found during narrow-
+  viewport verification, see "Known limitations" below): `sr-only` moved from the `<table>`
+  itself onto a wrapping `<div>`, since a `clip-path`-hidden table doesn't shrink its own layout
+  box the way an ordinary element does.
+- **URLs:** None (no new application-facing routes).
+- **Manual test steps:** See "Accessibility" under "Manual test checklist" below.
+- **Known limitations:** This automated + manual pass is not a WCAG conformance certification —
+  axe-core catches roughly a third of WCAG success criteria by nature (anything requiring human
+  judgment — meaningful alt text quality, logical reading order, cognitive load — is out of its
+  reach). **No live screen-reader (NVDA/JAWS/VoiceOver/Orca) pass was performed** — none is
+  available in this headless Linux sandbox, so section 9 of the review below is explicitly not
+  claimed complete; a human with real AT access still needs to do this. 200%-zoom (simulated as
+  a 640×480 viewport) and a 375×667 narrow viewport were verified concretely, not just reviewed
+  at the code level: `document.documentElement.scrollWidth` was checked for horizontal overflow
+  on the dashboard, bugs list, bug detail, and new-bug form. This caught one real defect —
+  `VisuallyHiddenTable` applied Tailwind's `sr-only` directly to a `<table>` element; a
+  `clip-path`-based hide (Tailwind v4's implementation) doesn't shrink a table's own layout box
+  the way it does an ordinary element, so the hidden table still contributed ~250px of real
+  width, causing 19px of horizontal page overflow on a 375px-wide viewport specifically on the
+  dashboard (`frontend/src/app/visually-hidden-table.tsx`). Fixed by moving `sr-only` onto a
+  wrapping `<div>` instead — verified back to 0px overflow afterward. `prefers-reduced-motion:
+  reduce` was verified to actually collapse `animation-duration`/`transition-duration` to
+  `0.01ms` via `page.emulateMedia()`, not just reviewed as a CSS rule in isolation. The
+  keyboard-only pass itself was exercised via the automated `keyboard-navigation.spec.ts`
+  scenarios (5 real Chromium sessions), not a separate live human click-through — a human pass
+  is still worth doing for the flows those 5 scenarios don't cover (e.g. comment editing,
+  attachment upload, tag add/remove).
+
 ## Manual test checklist
 
 **First-run setup**
@@ -597,6 +665,63 @@ affected by the date range", etc.) — the date filter never silently does nothi
 2. Edit and save in tab A.
 3. Edit and save in tab B without reloading; confirm a version-conflict message appears rather
    than a silent overwrite, and that "Reload latest version" recovers tab B.
+
+**Accessibility**
+
+This is a concise manual checklist, not a WCAG conformance claim — `npx playwright test
+e2e/accessibility.spec.ts` covers automated axe-core scanning (serious/critical violations
+only, no rules disabled) and `e2e/keyboard-navigation.spec.ts` covers a handful of
+keyboard-only journeys; both should stay green. The items below are what a human still needs
+to check by hand.
+
+1. **Keyboard-only pass:** unplug your mouse (or just don't touch it) and complete the sign-in
+   → dashboard → create a bug → comment with a mention → upload an attachment → archive a bug
+   flow using only Tab, Shift+Tab, Enter, Space, arrow keys, and Escape. Confirm every
+   interactive element is reachable and operable, and that focus never becomes visually
+   invisible or gets trapped somewhere with no way out. *(Automated coverage exists for 5 of
+   these sub-flows — sign-in, skip link, bug creation, notification dropdown, destructive-dialog
+   cancel — in `e2e/keyboard-navigation.spec.ts`; comment editing, mentioning, and attachment
+   upload specifically still need a live human pass.)*
+2. **Skip link:** on any authenticated page, press Tab once (past the browser chrome, and past
+   Next's dev-tools overlay if running the dev server — neither exists for a real user) and
+   confirm "Skip to main content" appears and, on Enter, moves focus into the page's main
+   content.
+3. **Screen reader spot check:** with VoiceOver (macOS), NVDA, or JAWS, sign in, open a bug,
+   post a mentioned comment, and confirm: the mention suggestion count is announced, the
+   dialog's title/description are announced when a delete/archive confirmation opens, and
+   upload progress doesn't spam a percentage announcement on every tick. **Not yet performed —
+   no screen reader is available in this project's own sandbox/CI environment; this needs a
+   human with real AT access before it can be marked done.**
+4. **200% browser zoom:** zoom the whole page to 200% (not just text) on the dashboard, bugs
+   list, and bug detail pages. Confirm no essential content or control disappears, and that any
+   horizontal scrolling is contained to a specific wide element (a table, a chart) rather than
+   the whole page. *(Verified via a simulated 640×480 viewport + `scrollWidth` check: 0px
+   horizontal overflow on dashboard/bugs/bug-detail. A real browser's 200%-zoom reflow can still
+   differ in ways a viewport-size proxy doesn't catch — worth a spot check in a real browser.)*
+5. **Narrow viewport (~375px):** confirm the nav, forms, tables, and dialogs remain usable —
+   wrapping rather than clipping content — down to a typical phone width. *(Verified concretely
+   at 375×667: this caught a real bug — `VisuallyHiddenTable`'s `sr-only` `<table>` was
+   contributing ~250px of real (if invisible) width, causing 19px of horizontal page overflow on
+   the dashboard specifically. Fixed by moving `sr-only` onto a wrapping `<div>` instead; 0px
+   overflow confirmed afterward. The new-bug form was already clean at this width.)*
+6. **Reduced motion:** enable "reduce motion" in your OS accessibility settings, reload, and
+   confirm loading skeletons and other animated states no longer pulse/animate (see the
+   `prefers-reduced-motion` rule in `frontend/src/app/globals.css`). *(Verified via
+   `page.emulateMedia({ reducedMotion: "reduce" })`: `animation-duration` and
+   `transition-duration` both collapse to `0.01ms` as intended.)*
+7. **Dialogs:** open each destructive confirmation (comment delete/redact, attachment remove,
+   bug/project archive). Confirm: initial focus lands on Cancel (never the destructive button),
+   Tab cycles only between the dialog's own Cancel/Confirm buttons, Escape closes it, and focus
+   returns to the button that opened it.
+8. **Forms:** submit each form (sign-in, setup, bug/project create, tag add) with invalid or
+   empty required fields and confirm the error text is visually associated with its field (not
+   just floating nearby) and is not conveyed by color alone.
+9. **Charts:** confirm every dashboard chart has a visible heading and that its data is also
+   available as a table in the accessibility tree (browser dev tools' Accessibility panel, or a
+   screen reader) — not just visually, in the chart itself.
+10. **Notification menu:** open the bell dropdown with Enter, confirm the unread count is
+    announced as part of the trigger's accessible name (not conveyed by the red badge alone),
+    and confirm Escape closes it and returns focus to the bell.
 
 ## Troubleshooting
 

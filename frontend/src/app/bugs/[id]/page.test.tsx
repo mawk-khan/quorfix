@@ -246,7 +246,8 @@ describe("BugDetailPage", () => {
     vi.mocked(getBug).mockRejectedValueOnce(new ApiError(404, { detail: "Not found." }));
     renderWithProviders(<BugDetailPage />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/does not exist or you don't have access/i);
+    expect(await screen.findByRole("heading", { name: /not found/i })).toBeInTheDocument();
+    expect(screen.getByText(/does not exist or you don't have access/i)).toBeInTheDocument();
   });
 
   it("renders the new attachments/discussion sections alongside existing controls without duplicate bug fetches", async () => {

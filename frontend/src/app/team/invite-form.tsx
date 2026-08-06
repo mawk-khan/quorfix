@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
 import type { CommunityRole } from "@/lib/api/types";
+import { errorProps } from "@/lib/forms/error-props";
 import { inviteMemberSchema, type InviteMemberFormValues } from "@/lib/validation/invitations";
 
 const ROLES: CommunityRole[] = ["administrator", "developer", "qa", "reporter", "viewer"];
@@ -37,11 +38,13 @@ export function InviteForm({ onSubmit, isSubmitting }: InviteFormProps) {
         <input
           id="invite-email"
           type="email"
+          autoComplete="email"
           className="mt-1 rounded border px-3 py-2"
+          {...errorProps("invite-email", errors.email)}
           {...register("email")}
         />
         {errors.email && (
-          <p role="alert" className="mt-1 text-sm text-red-700">
+          <p id="invite-email-error" role="alert" className="mt-1 text-sm text-red-700">
             {errors.email.message}
           </p>
         )}

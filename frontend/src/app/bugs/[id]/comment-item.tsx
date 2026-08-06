@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { AlertDialog } from "@/components/alert-dialog";
 import { deleteComment, redactComment, updateComment } from "@/lib/api/comments";
 import { ApiError } from "@/lib/api/client";
 import type { Comment, Membership } from "@/lib/api/types";
@@ -55,6 +56,22 @@ export function CommentItem({ bugId, comment, members, onMutated, onStaleState }
   const [confirmingRedact, setConfirmingRedact] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingAction, setPendingAction] = useState<"edit" | "delete" | "redact" | null>(null);
+  const editButtonRef = useRef<HTMLButtonElement>(null);
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
+  const redactButtonRef = useRef<HTMLButtonElement>(null);
+  const wasEditing = useRef(false);
+
+  // Leaving edit mode — whether by Cancel or a successful Save — unmounts
+  // the MentionTextarea, so without this, focus would simply be dropped
+  // (falling back to the document body) rather than landing somewhere
+  // sensible. The Edit button is the nearest logical control once editing
+  // ends, and it exists again the instant `editing` flips back to false.
+  useEffect(() => {
+    if (wasEditing.current && !editing) {
+      editButtonRef.current?.focus();
+    }
+    wasEditing.current = editing;
+  }, [editing]);
 
   function startEditing() {
     setEditValue(comment.body);
@@ -191,17 +208,32 @@ export function CommentItem({ bugId, comment, members, onMutated, onStaleState }
           {!isRemoved && !editing && (comment.can_edit || comment.can_delete || comment.can_redact) && (
             <div className="mt-1 flex items-center gap-3 text-xs">
               {comment.can_edit && (
-                <button type="button" onClick={startEditing} className="text-blue-700 underline">
+                <button
+                  ref={editButtonRef}
+                  type="button"
+                  onClick={startEditing}
+                  className="text-blue-700 underline"
+                >
                   Edit
                 </button>
               )}
               {comment.can_delete && !confirmingDelete && (
-                <button type="button" onClick={() => setConfirmingDelete(true)} className="text-red-700 underline">
+                <button
+                  ref={deleteButtonRef}
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  className="text-red-700 underline"
+                >
                   Delete
                 </button>
               )}
               {comment.can_redact && !confirmingRedact && (
-                <button type="button" onClick={() => setConfirmingRedact(true)} className="text-red-700 underline">
+                <button
+                  ref={redactButtonRef}
+                  type="button"
+                  onClick={() => setConfirmingRedact(true)}
+                  className="text-red-700 underline"
+                >
                   Redact
                 </button>
               )}
@@ -209,44 +241,27 @@ export function CommentItem({ bugId, comment, members, onMutated, onStaleState }
           )}
 
           {confirmingDelete && (
-            <div role="alertdialog" aria-label="Confirm delete comment" className="mt-2 space-y-1 rounded border border-red-300 bg-red-50 p-2 text-xs">
-              <p>Delete this comment? This cannot be undone.</p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={confirmDelete}
-                  disabled={pendingAction === "delete"}
-                  className="text-red-700 underline disabled:opacity-50"
-                >
-                  Confirm delete
-                </button>
-                <button type="button" onClick={() => setConfirmingDelete(false)} className="underline">
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <AlertDialog
+              title="Confirm delete comment"
+              description="Delete this comment? This cannot be undone."
+              confirmLabel="Confirm delete"
+              onConfirm={confirmDelete}
+              onCancel={() => setConfirmingDelete(false)}
+              pending={pendingAction === "delete"}
+              restoreFocusTo={deleteButtonRef}
+            />
           )}
 
           {confirmingRedact && (
-            <div role="alertdialog" aria-label="Confirm redact comment" className="mt-2 space-y-1 rounded border border-red-300 bg-red-50 p-2 text-xs">
-              <p>
-                Redact this comment? The comment body will be permanently removed, but a
-                moderation record will remain in the activity history. This cannot be undone.
-              </p>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={confirmRedact}
-                  disabled={pendingAction === "redact"}
-                  className="text-red-700 underline disabled:opacity-50"
-                >
-                  Confirm redact
-                </button>
-                <button type="button" onClick={() => setConfirmingRedact(false)} className="underline">
-                  Cancel
-                </button>
-              </div>
-            </div>
+            <AlertDialog
+              title="Confirm redact comment"
+              description="Redact this comment? The comment body will be permanently removed, but a moderation record will remain in the activity history. This cannot be undone."
+              confirmLabel="Confirm redact"
+              onConfirm={confirmRedact}
+              onCancel={() => setConfirmingRedact(false)}
+              pending={pendingAction === "redact"}
+              restoreFocusTo={redactButtonRef}
+            />
           )}
         </div>
       </div>

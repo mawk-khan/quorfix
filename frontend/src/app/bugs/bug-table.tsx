@@ -28,6 +28,7 @@ export function BugTable({ bugs, hasActiveFilters }: BugTableProps) {
 
   return (
     <table className="mt-2 w-full text-left text-sm">
+      <caption className="sr-only">Bugs</caption>
       <thead>
         <tr>
           <th scope="col" className="pb-2">

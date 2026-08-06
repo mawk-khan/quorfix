@@ -26,7 +26,7 @@ export function RecentActivityFeed({ query }: RecentActivityFeedProps) {
     >
       {(page) => (
         <>
-          <p className="mb-2 text-xs text-gray-400">Most recent first — not affected by the date range</p>
+          <p className="mb-2 text-xs text-gray-500">Most recent first — not affected by the date range</p>
           <ul className="divide-y">
             {page.results.map((activity) => (
               <li key={activity.id} className="py-2 text-sm">

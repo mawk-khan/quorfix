@@ -40,7 +40,8 @@ describe("NewProjectPage", () => {
     mockSession("developer");
     renderWithProviders(<NewProjectPage />);
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/do not have permission/i);
+    expect(await screen.findByRole("heading", { name: /access restricted/i })).toBeInTheDocument();
+    expect(screen.getByText(/do not have permission to create projects/i)).toBeInTheDocument();
   });
 
   it("shows validation errors for an empty submission", async () => {

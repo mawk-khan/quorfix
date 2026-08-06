@@ -33,7 +33,7 @@ export default function HomePage() {
     // wrapped in Suspense — matches app/bugs/page.tsx and app/notifications/page.tsx.
     <Suspense
       fallback={
-        <main className="p-8">
+        <main id="main-content" tabIndex={-1} className="p-8">
           <p>Loading…</p>
         </main>
       }
@@ -103,7 +103,7 @@ function DashboardPageContent() {
 
   if (sessionLoading) {
     return (
-      <main className="p-8">
+      <main id="main-content" tabIndex={-1} className="p-8">
         <p>Loading…</p>
       </main>
     );
@@ -111,7 +111,7 @@ function DashboardPageContent() {
 
   if (!session?.authenticated) {
     return (
-      <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
         <h1 className="text-2xl font-semibold">Bug Fixer</h1>
         <Link href="/sign-in" className="underline">
           Sign in
@@ -121,7 +121,7 @@ function DashboardPageContent() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl space-y-6 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl space-y-6 p-8">
       <h1 className="text-xl font-semibold">Dashboard</h1>
 
       <DashboardFilters

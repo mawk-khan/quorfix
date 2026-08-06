@@ -6,8 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
+import { AccessState } from "@/components/access-state";
 import { acceptInvitation, getInvitation } from "@/lib/api/invitations";
 import { useSession } from "@/lib/auth/session-provider";
+import { errorProps } from "@/lib/forms/error-props";
 import {
   acceptInvitationSchema,
   type AcceptInvitationFormValues,
@@ -55,7 +57,7 @@ export default function InvitationAcceptPage() {
 
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-8">
         <p>Loading invitation…</p>
       </main>
     );
@@ -63,14 +65,18 @@ export default function InvitationAcceptPage() {
 
   if (isError || !invitation) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-8">
-        <p role="alert">This invitation is invalid or has expired.</p>
+      <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-8">
+        <AccessState
+          heading="Invitation invalid"
+          message="This invitation is invalid or has expired."
+          action={{ href: "/sign-in", label: "Go to sign in" }}
+        />
       </main>
     );
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center p-8">
+    <main id="main-content" tabIndex={-1} className="flex min-h-screen items-center justify-center p-8">
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="w-full max-w-sm space-y-4"
@@ -91,10 +97,11 @@ export default function InvitationAcceptPage() {
             type="password"
             autoComplete="new-password"
             className="mt-1 w-full rounded border px-3 py-2"
+            {...errorProps("password", errors.password)}
             {...register("password")}
           />
           {errors.password && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p id="password-error" role="alert" className="mt-1 text-sm text-red-700">
               {errors.password.message}
             </p>
           )}

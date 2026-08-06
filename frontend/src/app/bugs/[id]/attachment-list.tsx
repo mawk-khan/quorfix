@@ -1,8 +1,9 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
+import { AlertDialog } from "@/components/alert-dialog";
 import { ApiError } from "@/lib/api/client";
 import {
   attachmentKeys,
@@ -44,6 +45,7 @@ function AttachmentRow({ bugId, attachment }: { bugId: string; attachment: Attac
   // list query) in sync; this flag is what guarantees *this* row disappears
   // right away regardless of that wiring.
   const [removed, setRemoved] = useState(false);
+  const removeButtonRef = useRef<HTMLButtonElement>(null);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: attachmentKeys.lists(bugId) });
@@ -117,24 +119,27 @@ function AttachmentRow({ bugId, attachment }: { bugId: string; attachment: Attac
           Download
         </button>
         {attachment.can_remove && !confirmingRemove && (
-          <button type="button" onClick={() => setConfirmingRemove(true)} className="text-red-700 underline">
+          <button
+            ref={removeButtonRef}
+            type="button"
+            onClick={() => setConfirmingRemove(true)}
+            className="text-red-700 underline"
+          >
             Remove
           </button>
         )}
       </div>
 
       {confirmingRemove && (
-        <div role="alertdialog" aria-label="Confirm remove attachment" className="space-y-1 rounded border border-red-300 bg-red-50 p-2 text-xs">
-          <p>Remove this attachment? This cannot be undone.</p>
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={handleRemove} disabled={pending === "remove"} className="text-red-700 underline disabled:opacity-50">
-              Confirm remove
-            </button>
-            <button type="button" onClick={() => setConfirmingRemove(false)} className="underline">
-              Cancel
-            </button>
-          </div>
-        </div>
+        <AlertDialog
+          title="Confirm remove attachment"
+          description="Remove this attachment? This cannot be undone."
+          confirmLabel="Confirm remove"
+          onConfirm={handleRemove}
+          onCancel={() => setConfirmingRemove(false)}
+          pending={pending === "remove"}
+          restoreFocusTo={removeButtonRef}
+        />
       )}
     </li>
   );
