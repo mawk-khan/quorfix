@@ -9,6 +9,47 @@ const backendInternalUrl = process.env.BACKEND_INTERNAL_URL ?? "http://localhost
 // server only (has no effect on `next build`/`next start`), unset by default.
 const allowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(",").filter(Boolean);
 
+// Verified against this app's actual production output (`next build` +
+// inspecting the rendered HTML — see the Chunk G completion report for the
+// exact commands), not assumed from Next.js documentation alone:
+//   - No <style> tags or inline style="" attributes anywhere in rendered
+//     HTML from Tailwind's own output, but Recharts (used by the dashboard)
+//     is documented upstream to render inline `style` attributes on its
+//     SVG/wrapper elements for responsive sizing — style-src therefore
+//     needs 'unsafe-inline'. This is a materially lower-risk relaxation
+//     than script-src: CSS injection alone cannot execute script or read
+//     application data the way inline JS can.
+//   - script-src DOES need 'unsafe-inline': Next.js App Router's React
+//     Server Components streaming payload (`self.__next_f.push(...)`) is
+//     delivered via genuinely inline, non-nonce'd <script> tags on every
+//     page — this is Next's own framework output, not app code. The
+//     documented alternative is a nonce issued per-request from
+//     middleware.ts, but that forces every route in this app into dynamic
+//     (per-request) rendering — several routes here (/, /bugs, /projects,
+//     /sign-in, /setup, /team, ...) are currently statically generated
+//     (see `next build`'s own route summary), and trading that away
+//     app-wide is a real architecture change out of scope for a
+//     security-headers pass. 'unsafe-inline' for script-src is the
+//     documented, honest trade-off this specific constraint requires — not
+//     a default reached without checking the alternative.
+//   - No unsafe-eval anywhere: production Turbopack output does not use
+//     eval() (that's a dev-server-only source-map mechanism).
+//   - No data: URIs and no external fonts/CDNs anywhere in this app (no
+//     next/image, no next/font, no third-party script/style tags) — so
+//     img-src/font-src need nothing beyond 'self'.
+const csp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self'",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'",
+].join("; ");
+
 const nextConfig: NextConfig = {
   // Traced, minimal-dependency build output (.next/standalone) used by the
   // production Docker image (frontend/Dockerfile's `runner` stage) — a
@@ -28,6 +69,33 @@ const nextConfig: NextConfig = {
         // request, so it's added back explicitly — Django's URLs require it.
         source: "/api/:path*",
         destination: `${backendInternalUrl}/api/:path*/`,
+      },
+    ];
+  },
+  // Applies to every response this server sends, HTML and static assets
+  // alike — a config-time header list, not per-request middleware, so it
+  // has no effect on which routes are statically vs. dynamically rendered.
+  //
+  // No Strict-Transport-Security here deliberately: this server is never
+  // the TLS-terminating edge (see docker-compose.prod.yml — only the
+  // frontend's own plain-HTTP port is published, and an operator's own
+  // reverse proxy is expected to terminate TLS in front of it). HSTS is
+  // that reverse proxy's responsibility — sending it here would be a false
+  // promise this process cannot itself guarantee. See docs/SECURITY.md.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "Content-Security-Policy", value: csp },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "X-Frame-Options", value: "DENY" },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=(), usb=()",
+          },
+        ],
       },
     ];
   },

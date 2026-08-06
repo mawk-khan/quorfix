@@ -165,6 +165,14 @@ class InvitationViewSet(GenericViewSet):
     # GET /api/invitations/<token>/ below would be shadowed by this route.
     lookup_value_regex = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
 
+    def get_throttles(self):
+        # Only `create` sends an email and creates a row an attacker could
+        # otherwise use to spam arbitrary external addresses — list/destroy
+        # have no comparable abuse surface, so only create is scoped.
+        if self.action == "create":
+            self.throttle_scope = "invitation-create"
+        return super().get_throttles()
+
     def list(self, request):
         invitations = get_pending_invitations(request.organization)
         page = self.paginate_queryset(invitations)

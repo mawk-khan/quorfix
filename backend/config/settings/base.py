@@ -157,6 +157,19 @@ REST_FRAMEWORK = {
         "setup-status": "60/min",
         "invitation-lookup": "30/min",
         "invitation-accept": "10/min",
+        # Chunk G additions — see docs/SECURITY.md "Rate limiting" for the
+        # full decision. invitation-create: an administrator-only action
+        # that sends email to an address the admin doesn't have to own —
+        # grouped with the other invitation/auth endpoints above rather
+        # than left unthrottled. attachment-upload: shared by both halves
+        # of an upload (initiate + upload-bytes) — bounds how fast a
+        # single account can fill the local attachment volume; generous
+        # enough for a normal multi-file drag-and-drop (up to 30 files/min)
+        # while still meaningfully slowing a scripted disk-fill attempt.
+        # Bug/comment creation deliberately have no throttle — see
+        # docs/SECURITY.md for why.
+        "invitation-create": "20/hour",
+        "attachment-upload": "30/min",
     },
 }
 

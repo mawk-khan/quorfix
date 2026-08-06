@@ -121,6 +121,15 @@ class AttachmentListCreateView(AttachmentErrorHandlingMixin, APIView):
 
     permission_classes = [IsOrganizationMember]
 
+    def get_throttles(self):
+        # Only POST (initiate) creates a new pending row and is what a
+        # scripted loop could use to exhaust the local attachment volume —
+        # GET has no comparable disk-exhaustion surface, so only POST is
+        # scoped. See config/settings/base.py's "attachment-upload" rate.
+        if self.request.method == "POST":
+            self.throttle_scope = "attachment-upload"
+        return super().get_throttles()
+
     @extend_schema(
         responses={
             200: AttachmentSerializer(many=True),
@@ -246,6 +255,11 @@ class AttachmentUploadBytesView(AttachmentErrorHandlingMixin, APIView):
 
     permission_classes = [IsOrganizationMember]
     parser_classes = [MultiPartParser]
+    # This view has only PUT — no method-conditional get_throttles() needed,
+    # unlike AttachmentListCreateView. Same scope/rate: this and initiate
+    # are the two halves of one upload, so they share a budget rather than
+    # each independently allowing the configured rate.
+    throttle_scope = "attachment-upload"
 
     _UPLOAD_REQUEST_SCHEMA = {
         "multipart/form-data": {

@@ -142,8 +142,7 @@ No repository URL is embedded here for status badges — this checkout's `origin
 Local commands mirroring each workflow (see each workflow's own file for the authoritative, exact sequence):
 
 ```bash
-make ci-backend         # requires: docker compose up -d db redis backend celery_worker
-make ci-backend-audit   # pip-audit — separate from ci-backend since it's non-blocking in CI
+make ci-backend         # requires: docker compose up -d db redis backend celery_worker; includes pip-audit
 make ci-frontend        # requires: docker compose up -d frontend
 make ci-e2e             # destructive to the dev stack's current DB — see scripts/ci_e2e.sh
 make ci-images          # builds only, never pushes
@@ -156,6 +155,13 @@ make community-check
 For local URLs, demo login credentials, the role permission matrix, a manual test checklist, and
 troubleshooting steps, see [docs/ACCESS_AND_TESTING.md](./docs/ACCESS_AND_TESTING.md). That
 document is the permanent, maintained reference — it is updated after every completed phase.
+
+## Security
+
+See [docs/SECURITY.md](./docs/SECURITY.md) for the vulnerability reporting process, security
+scope, and deployment assumptions (HTTPS/reverse-proxy responsibility, attachment security
+model, dependency scan policy). **The security contact in that document is a placeholder — the
+project owner must configure a real, monitored contact before any public release.**
 
 ## Licensing
 

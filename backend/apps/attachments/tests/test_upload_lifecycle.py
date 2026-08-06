@@ -67,6 +67,20 @@ class TestInitiate:
         admin_client.post(f"/api/bugs/{bug.pk}/archive/", {"version": bug.version}, format="json")
         assert _initiate(admin_client, bug).status_code == 409
 
+    def test_repeated_initiate_is_throttled(self, admin_client, bug, monkeypatch):
+        from django.core.cache import cache
+        from rest_framework.throttling import ScopedRateThrottle
+
+        # Same technique as apps.accounts.tests.test_auth's login-throttle
+        # test — see that test's comment for why monkeypatch.setitem (not
+        # override_settings) is what actually reaches ScopedRateThrottle.
+        monkeypatch.setitem(ScopedRateThrottle.THROTTLE_RATES, "attachment-upload", "1/min")
+        cache.clear()
+        first = _initiate(admin_client, bug, original_filename="one.txt")
+        second = _initiate(admin_client, bug, original_filename="two.txt")
+        assert first.status_code == 201
+        assert second.status_code == 429
+
     def test_archived_project_blocks_initiate(self, admin_client, bug, project):
         admin_client.post(f"/api/projects/{project.pk}/archive/")
         assert _initiate(admin_client, bug).status_code == 409

@@ -459,6 +459,37 @@ affected by the date range", etc.) — the date filter never silently does nothi
   dependency upgrade, not fixed in this chunk. `release.yml`'s actual push path has never been
   exercised (no registry/tag has ever been created) — it is a reviewed-but-unrun skeleton.
 
+### Phase 6 Chunk G: Dependency remediation and focused Community security hardening
+- **Status:** Complete
+- **Commit:** _(this change — update once committed)_
+- **Main functionality:** Django upgraded 5.1.6 → 5.1.15 (latest secure 5.1.x patch),
+  resolving all 20 advisories from Chunk F's baseline — `pip-audit` is now clean and
+  **blocking** in `backend.yml` (the `continue-on-error` from Chunk F was removed; the separate
+  `ci-backend-audit` Makefile target was folded into `ci-backend` since it's no longer a
+  distinct CI step). New `frontend/next.config.ts` `headers()`: CSP, `X-Content-Type-Options`,
+  `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy` on every response — no HSTS
+  (documented as the reverse proxy's responsibility). New throttle scopes
+  `invitation-create` (20/hour) and `attachment-upload` (30/min); bug/comment creation
+  deliberately left unthrottled (see `docs/SECURITY.md` "Rate limiting" for the full
+  reasoning). New `docs/SECURITY.md` (placeholder contact — see its own top note and
+  README.md). Audited tenant isolation, attachment security, comment/mention rendering,
+  notification security, and production logging — found and closed one real gap (the
+  `/api/bugs/{id}/activity/` endpoint had no cross-organization isolation test, though the
+  code itself was already correctly scoped) and one real test-coverage gap (nothing verified
+  the *real*, committed `config.settings.production` module's cookie/session values, only
+  synthetic `override_settings()` stand-ins — new
+  `backend/apps/core/tests/test_production_settings_real_values.py`). No routes or
+  user-visible functionality changed beyond the new response headers — this is a security
+  hardening and dependency-remediation pass.
+- **URLs:** None (no new application-facing routes; response headers apply everywhere).
+- **Manual test steps:** `curl -I` any page and confirm the headers above; see
+  `docs/SECURITY.md` for the full security model.
+- **Known limitations:** `pytest` (a dev-only tool, never shipped in production images) has
+  one open advisory (PYSEC-2026-1845, fixed in 9.0.3) found while auditing
+  `requirements-dev.txt` — out of this chunk's explicit scope (`backend/requirements.txt`) and
+  outside what `backend.yml`'s pip-audit step scans; noted here rather than silently dropped.
+  No malware/virus scanning of uploaded attachments exists in Community (documented, not new).
+
 ## Manual test checklist
 
 **First-run setup**

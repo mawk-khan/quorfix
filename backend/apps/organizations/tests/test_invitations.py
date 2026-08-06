@@ -2,8 +2,10 @@ from datetime import timedelta
 
 import pytest
 from django.core import mail
+from django.core.cache import cache
 from django.utils import timezone
 from rest_framework.test import APIClient
+from rest_framework.throttling import ScopedRateThrottle
 
 from apps.organizations.models import (
     CommunityRole,
@@ -27,6 +29,23 @@ class TestInvitationCreate:
             "/api/invitations/", {"email": "new@example.com", "role": "developer"}
         )
         assert response.status_code == 403
+
+    def test_repeated_invitation_creation_is_throttled(
+        self, admin_client, organization, monkeypatch
+    ):
+        # Same technique as apps.accounts.tests.test_auth's login-throttle
+        # test — see that test's comment for why monkeypatch.setitem (not
+        # override_settings) is what actually reaches ScopedRateThrottle.
+        monkeypatch.setitem(ScopedRateThrottle.THROTTLE_RATES, "invitation-create", "1/min")
+        cache.clear()
+        first = admin_client.post(
+            "/api/invitations/", {"email": "first@example.com", "role": "developer"}
+        )
+        second = admin_client.post(
+            "/api/invitations/", {"email": "second@example.com", "role": "developer"}
+        )
+        assert first.status_code == 201
+        assert second.status_code == 429
 
     def test_admin_can_invite_and_receives_invite_url(self, admin_client, organization):
         response = admin_client.post(

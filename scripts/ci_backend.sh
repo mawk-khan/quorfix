@@ -36,4 +36,9 @@ run pytest \
 
 run python manage.py spectacular --file /tmp/schema.yml --validate
 
-log "Backend CI sequence passed. (pip-audit is non-blocking in CI — run 'make ci-backend-audit' separately if you want it locally.)"
+# Blocking, same as .github/workflows/backend.yml — see docs/SECURITY.md
+# "Dependency scan policy". Installed fresh each run, not added to
+# requirements-dev.txt.
+run sh -c 'pip install --quiet pip-audit && pip-audit -r requirements.txt'
+
+log "Backend CI sequence passed."

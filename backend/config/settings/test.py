@@ -21,6 +21,8 @@ REST_FRAMEWORK = {  # noqa: F405
         "setup-status": "1000/min",
         "invitation-lookup": "1000/min",
         "invitation-accept": "1000/min",
+        "invitation-create": "1000/min",
+        "attachment-upload": "1000/min",
     },
 }
 

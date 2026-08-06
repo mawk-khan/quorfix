@@ -155,21 +155,22 @@ jobs:
       - name: Generate and validate OpenAPI schema
         run: python manage.py spectacular --file /tmp/schema.yml --validate
 
-      # Non-blocking by policy: pip-audit currently finds real, actionable
-      # findings against Django 5.1.6 (see the job summary below) whose fix
-      # is a Django patch upgrade — out of scope for this CI-hardening
-      # chunk. Findings are never silently discarded: they're always
-      # printed in full and written to the job summary, just don't fail
-      # the build until that upgrade lands as a tracked follow-up (see
-      # docs/ACCESS_AND_TESTING.md, Phase 6 Chunk F).
-      - name: Dependency audit (pip-audit, non-blocking — see job summary)
-        continue-on-error: true
+      # Blocking as of Phase 6 Chunk G: the Chunk F baseline (Django 5.1.6,
+      # 20 known advisories) was remediated by upgrading to Django 5.1.15
+      # (the latest secure 5.1.x patch — see docs/ACCESS_AND_TESTING.md
+      # Phase 6 Chunk G and docs/SECURITY.md "Dependency scan policy"), and
+      # the scan is clean. Per that policy, a clean scan is blocking; if a
+      # future advisory reintroduces a finding that needs a dependency
+      # upgrade out of scope for the change at hand, add continue-on-error
+      # back with a comment naming the exact advisory and tracked
+      # follow-up — never silently drop this step's failure.
+      - name: Dependency audit (pip-audit, blocking)
         run: |
           pip install --quiet pip-audit
           {
             echo '### Backend dependency audit (pip-audit)'
             echo
-            echo '`backend/requirements.txt`, including transitive dependencies. Non-blocking — see docs/ACCESS_AND_TESTING.md Phase 6 Chunk F for the tracked follow-up.'
+            echo '`backend/requirements.txt`, including transitive dependencies.'
             echo
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"

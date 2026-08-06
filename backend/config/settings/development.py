@@ -26,5 +26,11 @@ REST_FRAMEWORK = {
         "setup-status": "1000/min",
         "invitation-lookup": "100/min",
         "invitation-accept": "100/min",
+        # Same loosening rationale as the rates above — real base.py values
+        # (20/hour, 30/min) are tuned for production abuse resistance, not
+        # for a Playwright suite that creates several invitations/uploads
+        # per spec file across dozens of specs within one dev-server run.
+        "invitation-create": "100/min",
+        "attachment-upload": "300/min",
     },
 }

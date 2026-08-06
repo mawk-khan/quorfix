@@ -1,7 +1,10 @@
 import pytest
 
 from apps.activities.models import ActivityVerb, BugActivity
+from apps.bugs.models import Bug
 from apps.bugs.services import add_tag, transition_bug, update_bug
+from apps.organizations.models import CommunityRole, Organization, OrganizationMembership
+from apps.projects.models import Project, ProjectStatus
 
 
 @pytest.mark.django_db
@@ -104,3 +107,41 @@ class TestActivityFeedEndpoint:
             assert not (forbidden & set(k.lower() for k in activity.metadata.keys()))
             assert not any(f in activity.from_value.lower() for f in forbidden)
             assert not any(f in activity.to_value.lower() for f in forbidden)
+
+
+@pytest.mark.django_db
+class TestActivityFeedTenantIsolation:
+    """The activity feed endpoint (GET /api/bugs/{pk}/activity/) is nested
+    under a bug, not queried by its own ID — same-shaped gap as
+    apps.bugs.tests.test_bug_tenant_isolation, checked directly here since
+    that file only exercises the bug detail/mutation endpoints, never this
+    nested one."""
+
+    @pytest.fixture
+    def other_org_bug(self):
+        org = Organization.objects.create(name="Other Co", slug="other-co-activity-isolation")
+        project = Project.objects.create(
+            organization=org, key="OTH", name="Other", status=ProjectStatus.ACTIVE
+        )
+        from django.contrib.auth import get_user_model
+
+        other_user = get_user_model().objects.create_user(
+            username="other-org-admin-activity",
+            email="other-org-admin-activity@example.com",
+            password="x",
+        )
+        OrganizationMembership.objects.create(
+            organization=org, user=other_user, role=CommunityRole.ADMINISTRATOR
+        )
+        return Bug.objects.create(
+            organization=org,
+            project=project,
+            number=1,
+            key="OTH-1",
+            title="Other org's bug",
+            reporter=other_user,
+        )
+
+    def test_cannot_read_another_organizations_bug_activity(self, admin_client, other_org_bug):
+        response = admin_client.get(f"/api/bugs/{other_org_bug.pk}/activity/")
+        assert response.status_code == 404

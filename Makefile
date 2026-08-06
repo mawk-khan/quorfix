@@ -1,7 +1,7 @@
 .PHONY: seed-demo prod-config prod-build prod-up prod-down prod-check prod-migrate \
 	backup backup-db backup-attachments restore-db-confirm restore-attachments-confirm \
 	prod-migrations-check prod-migrations-plan prod-upgrade-check prod-version upgrade-smoke \
-	ci-backend ci-backend-audit ci-frontend ci-e2e ci-images openapi-check community-check
+	ci-backend ci-frontend ci-e2e ci-images openapi-check community-check
 
 # Seeds local development demo data (organization, one user per Community
 # role, three projects). Development-only — refuses to run under production
@@ -141,15 +141,11 @@ restore-attachments-confirm:
 # and does not touch. None of these push images or tag a release.
 
 # Requires docker-compose.yml's backend/celery_worker already running
-# (`docker compose up -d db redis backend celery_worker`).
+# (`docker compose up -d db redis backend celery_worker`). Includes
+# pip-audit (blocking, same as .github/workflows/backend.yml — see
+# docs/SECURITY.md "Dependency scan policy").
 ci-backend:
 	scripts/ci_backend.sh
-
-# Non-blocking in CI (see .github/workflows/backend.yml) — run this
-# separately, not as part of `ci-backend`, so a local pip-audit finding
-# never blocks a routine local `make ci-backend` run either.
-ci-backend-audit:
-	docker compose exec backend sh -c 'pip install --quiet pip-audit && pip-audit -r requirements.txt'
 
 # Requires docker-compose.yml's frontend already running
 # (`docker compose up -d frontend`).
