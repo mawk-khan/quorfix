@@ -1,0 +1,118 @@
+name: images
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - "backend/Dockerfile"
+      - "backend/.dockerignore"
+      - "backend/requirements.txt"
+      - "frontend/Dockerfile"
+      - "frontend/.dockerignore"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/images.yml"
+  pull_request:
+    paths:
+      - "backend/Dockerfile"
+      - "backend/.dockerignore"
+      - "backend/requirements.txt"
+      - "frontend/Dockerfile"
+      - "frontend/.dockerignore"
+      - "frontend/package.json"
+      - "frontend/package-lock.json"
+      - "docker-compose.prod.yml"
+      - ".github/workflows/images.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: images-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Validation only: builds locally on the runner and never authenticates to
+# any registry, so `contents: read` is all this job ever needs. A future,
+# separate release job that actually pushes to GHCR is the only place
+# `packages: write` belongs — see .github/workflows/release.yml (skeleton,
+# does not run automatically).
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend production image
+        run: |
+          docker build \
+            --build-arg VERSION="${GITHUB_SHA::12}" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
+            -t bugfixer-backend:ci \
+            ./backend
+
+      - name: Build frontend production image
+        run: |
+          docker build \
+            --build-arg VERSION="${GITHUB_SHA::12}" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
+            --build-arg BACKEND_INTERNAL_URL=http://backend:8000 \
+            -t bugfixer-frontend:ci \
+            ./frontend
+
+      # No image is pushed anywhere by this job — these are local-only
+      # tags (":ci") on the runner's own Docker daemon, discarded with the
+      # rest of the ephemeral VM when the job ends.
+      - name: Record image metadata and digest
+        run: |
+          {
+            echo "### Production image metadata"
+            echo
+            echo "| Image | Version label | Revision label | Digest |"
+            echo "| --- | --- | --- | --- |"
+            for image in bugfixer-backend:ci bugfixer-frontend:ci; do
+              version="$(docker inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.version"}}')"
+              revision="$(docker inspect "$image" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+              digest="$(docker inspect "$image" --format '{{.Id}}')"
+              echo "| $image | $version | $revision | $digest |"
+            done
+          } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
+
+      # backend/Dockerfile's production stage runs as `app` (uid 1000);
+      # frontend/Dockerfile's runner stage runs as node:22-slim's built-in
+      # `node` user (uid 1000). Neither is root (uid 0) — this is the
+      # actual security property that matters, checked by parsing `id -u`
+      # rather than just trusting the Dockerfile's USER directive wasn't
+      # silently overridden downstream.
+      - name: Verify runtime users are non-root
+        run: |
+          # --entrypoint id bypasses backend/Dockerfile's entrypoint.sh
+          # (which otherwise requires a full production environment and a
+          # writable attachment root before it execs anything, by design —
+          # see docs/BACKUP_AND_RESTORE.md/docs/UPGRADING.md); this check
+          # only needs to know the image's *own configured user*, not run
+          # the application.
+          backend_uid="$(docker run --rm --entrypoint id bugfixer-backend:ci -u)"
+          echo "backend runtime uid: $backend_uid"
+          test "$backend_uid" -ne 0
+
+          frontend_uid="$(docker run --rm --entrypoint id bugfixer-frontend:ci -u)"
+          echo "frontend runtime uid: $frontend_uid"
+          test "$frontend_uid" -ne 0
+
+      # Minimal, non-destructive: proves each image's actual production
+      # entrypoint binary is present and executable, without needing a
+      # database/Redis/production .env in this job — those are what
+      # backend/Dockerfile's entrypoint.sh itself would require, so these
+      # checks deliberately bypass it (--entrypoint) rather than duplicate
+      # docker-compose.prod.yml's full stack here. The full stack already
+      # gets exercised for real in the e2e workflow and in the disposable
+      # backup/restore and upgrade drills documented in docs/.
+      - name: Minimal container smoke check
+        run: |
+          docker run --rm --entrypoint gunicorn bugfixer-backend:ci --version
+          docker run --rm --entrypoint celery bugfixer-backend:ci --version
+          docker run --rm --entrypoint sh bugfixer-frontend:ci -c "test -f server.js && echo 'server.js present'"
+          docker run --rm --entrypoint node bugfixer-frontend:ci --version

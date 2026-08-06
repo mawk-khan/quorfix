@@ -27,9 +27,7 @@ class TestSetupInstanceService:
     def test_second_call_raises_already_completed(self, password):
         setup_instance(organization_name="Acme", email="admin@example.com", password=password)
         with pytest.raises(SetupAlreadyCompleted):
-            setup_instance(
-                organization_name="Other", email="other@example.com", password=password
-            )
+            setup_instance(organization_name="Other", email="other@example.com", password=password)
         # Only the first organization/membership exist.
         assert Organization.objects.count() == 1
         assert OrganizationMembership.objects.count() == 1

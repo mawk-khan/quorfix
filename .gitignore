@@ -36,3 +36,11 @@ Thumbs.db
 
 # --- Docker ---
 *.pid
+
+# --- Backup/restore (see docs/BACKUP_AND_RESTORE.md) ---
+# scripts/backup.sh refuses to write inside the repository, but ignore the
+# conventional recovery-set directory name in case one ever ends up here
+# anyway (e.g. a relative destination path passed by mistake). Narrow and
+# specific on purpose — not a blanket *.dump/*.tar.gz pattern, which could
+# hide legitimate test fixtures using those extensions.
+bugfixer-backup-*/

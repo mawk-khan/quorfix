@@ -68,6 +68,69 @@ actually discards the data — a plain `docker compose down` does not.
 
 **Never run the reset procedure against staging or production.**
 
+## Backup and restore
+
+See [docs/BACKUP_AND_RESTORE.md](./BACKUP_AND_RESTORE.md) for the full PostgreSQL and local
+attachment backup/restore runbook (`scripts/backup.sh`, `scripts/restore_db.sh`,
+`scripts/restore_attachments.sh`).
+
+**Warning:** against `docker-compose.prod.yml` specifically, `docker compose -f
+docker-compose.prod.yml down -v` deletes the `postgres_data` **and** `attachments_data` named
+volumes — all database and attachment data, not just Postgres. Never run this against a real
+deployment without a verified, current backup (see "Backup verification" in
+[docs/BACKUP_AND_RESTORE.md](./BACKUP_AND_RESTORE.md)).
+
+To rehearse a restore with zero risk to real data, run the disposable end-to-end restore drill
+described in "Full restore procedure" in
+[docs/BACKUP_AND_RESTORE.md](./BACKUP_AND_RESTORE.md) — it uses its own disposable Compose
+volumes and is never run against your normal development stack.
+
+## Upgrading
+
+See [docs/UPGRADING.md](./UPGRADING.md) for the full upgrade, migration, and rollback
+procedure (support policy, pre-upgrade checks, `make prod-upgrade-check`/`make
+upgrade-smoke`, and the rollback decision tree).
+
+**Warning:** once a migration has actually run, rolling back to the previous code image
+alone may not be safe — the previous code was never tested against the new schema. Per
+`docs/UPGRADING.md`'s migration audit, essentially no migration in this codebase today has a
+verified-reversible rollback path; the default, documented rollback mechanism is restoring
+the pre-upgrade backup (see "Rollback decision tree" in `docs/UPGRADING.md`), which discards
+any writes made after that backup was taken.
+
+To rehearse an upgrade with zero risk to real data, run the disposable end-to-end upgrade
+drill described in `docs/UPGRADING.md` — like the restore drill above, it uses its own
+disposable Compose volumes (via an isolated `git worktree` for the prior-version source) and
+is never run against your normal development stack.
+
+## Continuous integration
+
+Four GitHub Actions workflows (`.github/workflows/`) enforce the release-readiness baseline:
+`backend.yml`, `frontend.yml`, `e2e.yml`, and `images.yml` (production image build validation
+— builds only, never pushes). `release.yml` is a dormant skeleton that only triggers on a
+`vX.Y.Z` tag push; nothing in the repository's history has created one.
+
+Local commands mirroring each workflow (see README.md's "Continuous integration" section, or
+each workflow file itself, for the authoritative exact sequence):
+
+```bash
+make ci-backend         # requires: docker compose up -d db redis backend celery_worker
+make ci-frontend        # requires: docker compose up -d frontend
+make ci-e2e             # see warning below
+make ci-images          # builds only, never pushes
+make openapi-check
+make community-check
+```
+
+**Warning:** `make ci-e2e` (and the `e2e.yml` workflow it mirrors) is destructive to whatever
+is currently in the dev stack's database — `frontend/e2e/global-setup.ts` flushes it and
+reseeds only the deterministic, namespaced E2E fixtures (`seed_e2e_bug_fixture`,
+`seed_e2e_analytics_fixture`), not your own local dev data. `scripts/ci_e2e.sh` backs up and
+restores your `.env` automatically and always tears the stack down (including its volumes)
+when it finishes, but the reset itself is real and happens every run — never point
+`SKIP_E2E_DB_RESET=true` at a database you want to keep, and don't run `make ci-e2e` while you
+have local dev data in the same stack that you still need.
+
 ## Demo login accounts
 
 Produced by `python manage.py seed_demo` (`backend/apps/core/management/commands/seed_demo.py`).
@@ -327,6 +390,74 @@ affected by the date range", etc.) — the date filter never silently does nothi
 - **Known limitations:** See "Known Community limitations" under the Dashboard section above
   (server-timezone date boundaries, 60-second cache lag, no percentage-change indicators, no
   Professional reporting features).
+
+### Phase 6 Chunk D: Backup and restore
+- **Status:** Complete
+- **Commit:** _(this change — update once committed)_
+- **Main functionality:** PostgreSQL and local-attachment backup/restore for
+  `docker-compose.prod.yml`, treated as one coordinated recovery set. `scripts/backup.sh`
+  produces a timestamped `bugfixer-backup-<UTC timestamp>/` directory
+  (`manifest.txt`, `database.dump`, `attachments.tar.gz`, `checksums.sha256`);
+  `scripts/restore_db.sh`/`scripts/restore_attachments.sh` restore one artifact each, both
+  requiring an explicit `--confirm-restore` flag and validating checksum + manifest before
+  mutating anything. Attachment-archive extraction is guarded against path traversal
+  (`backend/apps/core/tar_safety.py`). No routes or user-visible functionality changed — this
+  is operator tooling and documentation only.
+- **URLs:** None (no application-facing change).
+- **Manual test steps:** See "Full restore procedure" and the disposable end-to-end restore
+  drill in [docs/BACKUP_AND_RESTORE.md](./BACKUP_AND_RESTORE.md).
+- **Known limitations:** Routine backups are not a transactionally synchronized
+  database/attachments snapshot (see "Consistency limitations" in
+  `docs/BACKUP_AND_RESTORE.md`) — a guaranteed-consistent snapshot requires a maintenance
+  window. Retention and encryption-at-rest are documented as operator policy, not enforced by
+  the tooling.
+
+### Phase 6 Chunk E: Upgrade, migration, and rollback documentation
+- **Status:** Complete
+- **Commit:** _(this change — update once committed)_
+- **Main functionality:** `docs/UPGRADING.md` — a conservative pre-1.0 upgrade support policy,
+  a full migration audit (leaf nodes, `RunPython`/reversibility findings, lock-risk table), a
+  step-by-step upgrade procedure using the actual `docker-compose.prod.yml` service names, an
+  explicit rollback decision tree (before migrations / verified-reversible / uncertain-or-
+  irreversible / new-writes-since-backup), and Celery task cross-version compatibility
+  findings. New non-destructive Makefile targets `prod-migrations-check`,
+  `prod-migrations-plan`, `prod-upgrade-check`, `prod-version`, `upgrade-smoke`;
+  `scripts/upgrade_smoke.sh` (read-only container/health/migration-status check) and
+  `scripts/inspect_version.sh` (OCI image label inspection). No routes or user-visible
+  functionality changed — this is operator tooling and documentation only.
+- **URLs:** None (no application-facing change).
+- **Manual test steps:** See the disposable end-to-end upgrade drill in
+  [docs/UPGRADING.md](./UPGRADING.md).
+- **Known limitations:** No migration in the current codebase has a verified-reversible
+  rollback path (see the migration audit in `docs/UPGRADING.md`) — rollback after migrations
+  defaults to restoring the pre-upgrade backup, which discards writes made after that backup.
+  Rolling/mixed-version deployment is not supported before 1.0.
+
+### Phase 6 Chunk F: CI hardening, dependency scanning, OpenAPI validation, and release-build verification
+- **Status:** Complete
+- **Commit:** _(this change — update once committed)_
+- **Main functionality:** `backend.yml` now runs Ruff format check, a Django system check,
+  migration drift + unapplied checks, OpenAPI generation+validation, an explicit
+  Community-only verification step, and a non-blocking pip-audit dependency scan.
+  `frontend.yml` switched from `npm install` to `npm ci` and added a blocking `npm audit
+  --audit-level=high` (current baseline: 0 vulnerabilities). `e2e.yml` was reworked to run the
+  full stack via `docker compose` instead of raw background processes — this fixed two real,
+  pre-existing gaps found during the audit: `dashboard.spec.ts`'s required
+  `seed_e2e_analytics_fixture` was never seeded in CI, and the workflow set
+  `SKIP_E2E_DB_RESET=true`, bypassing `global-setup.ts`'s real reset path entirely. New
+  `images.yml` builds both production images (never pushes), verifies non-root runtime users,
+  and runs a minimal container smoke check. New dormant `release.yml` skeleton (tag-triggered
+  only, never runs on its own). New `scripts/ci_backend.sh`, `ci_frontend.sh`, `ci_e2e.sh`,
+  `ci_images.sh`, wired to new Makefile targets (`ci-backend`, `ci-backend-audit`,
+  `ci-frontend`, `ci-e2e`, `ci-images`, `openapi-check`, `community-check`). No routes or
+  user-visible functionality changed — this is CI/tooling and documentation only.
+- **URLs:** None (no application-facing change).
+- **Manual test steps:** See "Continuous integration" above for local command equivalents to
+  every workflow.
+- **Known limitations:** pip-audit currently finds real, actionable findings against Django
+  5.1.6 (fixed in 5.1.15+) — non-blocking in CI by policy, tracked here as a follow-up
+  dependency upgrade, not fixed in this chunk. `release.yml`'s actual push path has never been
+  exercised (no registry/tag has ever been created) — it is a reviewed-but-unrun skeleton.
 
 ## Manual test checklist
 

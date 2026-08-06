@@ -131,9 +131,7 @@ class MembershipViewSet(GenericViewSet):
         return self.get_paginated_response(serializer.data)
 
     def partial_update(self, request, pk=None):
-        membership = get_object_or_404(
-            get_organization_members(request.organization), pk=pk
-        )
+        membership = get_object_or_404(get_organization_members(request.organization), pk=pk)
         serializer = MembershipRoleUpdateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -149,9 +147,7 @@ class MembershipViewSet(GenericViewSet):
         return Response(MembershipSerializer(membership).data)
 
     def destroy(self, request, pk=None):
-        membership = get_object_or_404(
-            get_organization_members(request.organization), pk=pk
-        )
+        membership = get_object_or_404(get_organization_members(request.organization), pk=pk)
         try:
             remove_member(membership=membership)
         except LastAdministratorError:
@@ -214,9 +210,7 @@ class InvitationViewSet(GenericViewSet):
         return Response(data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, pk=None):
-        invitation = get_object_or_404(
-            get_pending_invitations(request.organization), pk=pk
-        )
+        invitation = get_object_or_404(get_pending_invitations(request.organization), pk=pk)
         revoke_invitation(invitation=invitation)
         return Response(status=status.HTTP_204_NO_CONTENT)
 

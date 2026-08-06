@@ -1,0 +1,93 @@
+name: release
+
+# Skeleton only. This workflow has never run — it triggers exclusively on
+# pushing a version tag (vX.Y.Z), and no chunk of work so far has created
+# one (Bug Fixer Community has not cut a release yet). Nothing here runs
+# as a side effect of a normal push, pull request, or any other workflow
+# in this repository. Actual first use of this workflow — including
+# confirming the GHCR namespace/visibility and reviewing this file once
+# more — belongs to the release-documentation phase, not this CI-hardening
+# chunk.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+# A release build should run to completion once started, not be cancelled
+# mid-push by a second tag push — unlike the CI workflows, this is
+# deliberately NOT cancel-in-progress.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+# contents: read is enough for validate-tag/build; packages: write is
+# scoped to only the job that actually pushes to GHCR — no other job or
+# workflow in this repository has (or needs) it.
+permissions:
+  contents: read
+
+jobs:
+  validate-tag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate tag format (vX.Y.Z)
+        run: |
+          if ! [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Tag '${GITHUB_REF_NAME}' does not match the required vX.Y.Z format" >&2
+            exit 1
+          fi
+          echo "Tag '${GITHUB_REF_NAME}' is well-formed."
+
+  build-and-push:
+    needs: validate-tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # GITHUB_TOKEN only — no personal access token, no long-lived
+          # credential, nothing embedded in this file.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build backend production image
+        run: |
+          docker build \
+            --build-arg VERSION="${GITHUB_REF_NAME#v}" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
+            -t "ghcr.io/${{ github.repository_owner }}/bugfixer-backend:${GITHUB_REF_NAME}" \
+            ./backend
+
+      - name: Build frontend production image
+        run: |
+          docker build \
+            --build-arg VERSION="${GITHUB_REF_NAME#v}" \
+            --build-arg VCS_REF="${GITHUB_SHA}" \
+            --build-arg BACKEND_INTERNAL_URL=http://backend:8000 \
+            -t "ghcr.io/${{ github.repository_owner }}/bugfixer-frontend:${GITHUB_REF_NAME}" \
+            ./frontend
+
+      - name: Push images
+        run: |
+          docker push "ghcr.io/${{ github.repository_owner }}/bugfixer-backend:${GITHUB_REF_NAME}"
+          docker push "ghcr.io/${{ github.repository_owner }}/bugfixer-frontend:${GITHUB_REF_NAME}"
+
+      - name: Record pushed image digests
+        run: |
+          {
+            echo "### Released images (${GITHUB_REF_NAME})"
+            echo
+            for image in bugfixer-backend bugfixer-frontend; do
+              digest="$(docker inspect "ghcr.io/${{ github.repository_owner }}/${image}:${GITHUB_REF_NAME}" --format '{{.Id}}')"
+              echo "- \`ghcr.io/${{ github.repository_owner }}/${image}:${GITHUB_REF_NAME}\` — \`${digest}\`"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

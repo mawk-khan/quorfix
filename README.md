@@ -96,9 +96,11 @@ make prod-up       # start db, redis, backend, celery_worker, frontend
 make prod-migrate  # explicit, separate step — never run automatically
 ```
 
-A full production deployment guide, including backup/restore and upgrade procedures, is a
-later, dedicated documentation phase — this is the current state of the container setup, not
-a complete operations manual.
+See [docs/BACKUP_AND_RESTORE.md](./docs/BACKUP_AND_RESTORE.md) for PostgreSQL and local
+attachment backup/restore procedures, and [docs/UPGRADING.md](./docs/UPGRADING.md) for the
+upgrade, migration, and rollback procedure. A full production deployment guide is a later,
+dedicated documentation phase — this is the current state of the container setup, not a
+complete operations manual.
 
 ## Testing
 
@@ -120,6 +122,33 @@ npm install
 npm run lint
 npm run typecheck
 npm run test:e2e   # requires the dev server running
+```
+
+## Continuous integration
+
+Four GitHub Actions workflows (`.github/workflows/`) enforce the release-readiness baseline:
+
+| Workflow | Runs on | What it checks |
+| --- | --- | --- |
+| `backend.yml` | push/PR touching `backend/**` | Ruff, Django system check, migration drift/unapplied checks, full pytest suite, OpenAPI generation+validation, Community-only isolation, pip-audit (non-blocking) |
+| `frontend.yml` | push/PR touching `frontend/**` | ESLint, TypeScript, Vitest, production build, npm audit (blocking) |
+| `e2e.yml` | push/PR touching `backend/**`, `frontend/**`, `docker-compose.yml` | Full Playwright suite against a disposable `docker compose` stack (Postgres, Redis, backend, Celery worker, frontend) |
+| `images.yml` | push to `master` / PR touching Docker build files / manual dispatch | Builds both production images, verifies non-root runtime users, minimal container smoke check — never pushes |
+
+`release.yml` is a dormant skeleton that only triggers on a `vX.Y.Z` tag push — no chunk of work so far has created one.
+
+No repository URL is embedded here for status badges — this checkout's `origin` remote isn't a public GitHub URL, so a badge here would either be wrong or invented; add real badges once the project has a public GitHub repository to point them at.
+
+Local commands mirroring each workflow (see each workflow's own file for the authoritative, exact sequence):
+
+```bash
+make ci-backend         # requires: docker compose up -d db redis backend celery_worker
+make ci-backend-audit   # pip-audit — separate from ci-backend since it's non-blocking in CI
+make ci-frontend        # requires: docker compose up -d frontend
+make ci-e2e             # destructive to the dev stack's current DB — see scripts/ci_e2e.sh
+make ci-images          # builds only, never pushes
+make openapi-check
+make community-check
 ```
 
 ## Local access and manual testing

@@ -10,6 +10,17 @@ on:
       - "backend/**"
       - ".github/workflows/backend.yml"
 
+# Cancel a superseded run on the same branch/PR rather than letting both
+# finish — the older run's result is moot the instant a newer push exists.
+concurrency:
+  group: backend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: this job only reads the repository and calls no GitHub
+# API beyond that. Nothing here needs to write packages, issues, or PRs.
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: backend
@@ -43,14 +54,23 @@ jobs:
           --health-retries 5
 
     env:
-      DJANGO_SECRET_KEY: ci-secret-key
+      # Explicit, not inherited from any ambient default — this job must
+      # never accidentally run against config.settings.development.
       DJANGO_SETTINGS_MODULE: config.settings.test
+      DJANGO_SECRET_KEY: ci-secret-key
       POSTGRES_DB: bugfixer
       POSTGRES_USER: bugfixer
       POSTGRES_PASSWORD: bugfixer
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
+      # config.settings.test sets CELERY_TASK_ALWAYS_EAGER=True (see
+      # backend/config/settings/test.py), so REDIS_URL only backs the cache
+      # here — no worker process is started, and none is needed: eager mode
+      # runs every dispatched task synchronously, in-process, deterministically.
       REDIS_URL: redis://localhost:6379/0
+      # A disposable, job-local directory — never the repo checkout itself
+      # and never a path any other job/step shares.
+      ATTACHMENTS_LOCAL_ROOT: /tmp/bugfixer-ci-attachments
 
     steps:
       - uses: actions/checkout@v4
@@ -59,12 +79,99 @@ jobs:
         with:
           python-version: "3.12"
           cache: "pip"
-          cache-dependency-path: backend/requirements-dev.txt
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-dev.txt
 
-      - run: pip install -r requirements-dev.txt
+      # requirements-dev.txt itself does `-r requirements.txt` (see that
+      # file), so this one install already covers both production and
+      # dev/test dependencies — installing requirements.txt again on its
+      # own would be redundant, not additive.
+      - name: Install dependencies (production + development/test)
+        run: pip install -r requirements-dev.txt
 
-      - run: ruff check .
+      - name: Ruff check
+        run: ruff check .
 
-      - run: python manage.py makemigrations --check --dry-run
+      - name: Ruff format check
+        run: ruff format --check .
 
-      - run: pytest
+      - name: Django system check (test settings)
+        run: python manage.py check
+
+      # Fails if any model change has no migration file yet. Does not
+      # create the missing file (--dry-run) — see docs/UPGRADING.md
+      # "Migration checks" for the confirmed exact behavior of this and
+      # the two commands below.
+      - name: Migration drift check
+        run: python manage.py makemigrations --check --dry-run
+
+      # Fails if any existing migration file is unapplied. This is a fresh
+      # CI database (the postgres service above), so in practice this only
+      # catches a migration that was added to the repo but never actually
+      # run against a real database anywhere — i.e. proves `migrate` itself
+      # doesn't error, which --check alone does not (it never touches the
+      # database schema).
+      - name: Unapplied migration check
+        run: |
+          python manage.py migrate --no-input
+          python manage.py migrate --check
+
+      - name: Full backend test suite
+        run: pytest
+
+      # Community-only isolation — explicit, visible CI step (not folded
+      # into the general pytest run above) proving the three existing
+      # isolation suites pass and that no Professional app is installed.
+      # backend/professional/ contains no importable code yet (only
+      # __init__.py + README.md) — there is nothing to "disable"; this
+      # proves that structurally rather than asserting around a feature
+      # that doesn't exist.
+      - name: Community-only verification
+        run: |
+          test ! -f professional/apps.py
+          python -c "
+          import django, os
+          os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings.test')
+          django.setup()
+          from django.conf import settings
+          professional_apps = [a for a in settings.INSTALLED_APPS if 'professional' in a]
+          assert not professional_apps, f'Professional apps present in INSTALLED_APPS: {professional_apps}'
+          print('No Professional app in INSTALLED_APPS.')
+          "
+          pytest apps/attachments/tests/test_community_isolation.py \
+                 apps/comments/tests/test_community_isolation.py \
+                 apps/notifications/tests/test_community_isolation.py -v
+
+      # --file writes to /tmp, never into the repo — see .env.example and
+      # this repo's policy of not committing a generated schema file.
+      # Confirmed locally: the current schema has pre-existing, non-fatal
+      # drf-spectacular serializer-inference notices (APIViews without a
+      # declared serializer_class — accounts/organizations/core auth and
+      # health views) and enum-naming/operationId collision warnings; none
+      # of them make generation fail or the schema invalid, so --validate
+      # currently exits 0. This step is not the place to silence or fix
+      # those — only to catch a *new* failure.
+      - name: Generate and validate OpenAPI schema
+        run: python manage.py spectacular --file /tmp/schema.yml --validate
+
+      # Non-blocking by policy: pip-audit currently finds real, actionable
+      # findings against Django 5.1.6 (see the job summary below) whose fix
+      # is a Django patch upgrade — out of scope for this CI-hardening
+      # chunk. Findings are never silently discarded: they're always
+      # printed in full and written to the job summary, just don't fail
+      # the build until that upgrade lands as a tracked follow-up (see
+      # docs/ACCESS_AND_TESTING.md, Phase 6 Chunk F).
+      - name: Dependency audit (pip-audit, non-blocking — see job summary)
+        continue-on-error: true
+        run: |
+          pip install --quiet pip-audit
+          {
+            echo '### Backend dependency audit (pip-audit)'
+            echo
+            echo '`backend/requirements.txt`, including transitive dependencies. Non-blocking — see docs/ACCESS_AND_TESTING.md Phase 6 Chunk F for the tracked follow-up.'
+            echo
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
+          pip-audit -r requirements.txt | tee -a "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
+          echo '```' >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"

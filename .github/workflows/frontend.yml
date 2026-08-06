@@ -10,9 +10,21 @@ on:
       - "frontend/**"
       - ".github/workflows/frontend.yml"
 
+concurrency:
+  group: frontend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: frontend
+
+env:
+  # No usage data sent, no first-run prompt to hang on — irrelevant to a CI
+  # job and not something this project wants reported anywhere.
+  NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
   build:
@@ -20,18 +32,40 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Matches frontend/Dockerfile's node:22-slim exactly — not the CI
+      # runner's own default, and never the host's ambient Node version
+      # (irrelevant here since setup-node always installs its own).
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
-      - run: npm install
+      # npm ci, not npm install: fails fast on a package.json/lockfile
+      # mismatch instead of silently rewriting package-lock.json, and
+      # always installs exactly what the lockfile pins — deterministic,
+      # matching how frontend/Dockerfile's `deps` stage installs too.
+      - run: npm ci
 
-      - run: npm run lint
+      - name: ESLint
+        run: npm run lint
 
-      - run: npm run typecheck
+      - name: TypeScript type check
+        run: npm run typecheck
 
-      - run: npm run test
+      - name: Vitest suite
+        run: npm run test
 
-      - run: npm run build
+      # Same build Next.js produces for the production image (frontend/
+      # Dockerfile's `builder` stage runs the identical `next build`, with
+      # output: "standalone" from next.config.ts and the same
+      # BACKEND_INTERNAL_URL build-time resolution) — this step doesn't
+      # need a real backend reachable, since next build only resolves
+      # next.config.ts's rewrite target string, it never calls it.
+      - name: Production build
+        run: npm run build
+
+      # Baseline is currently clean (0 vulnerabilities at any severity) —
+      # per policy, a clean baseline makes this blocking.
+      - name: Dependency audit (npm audit, blocking)
+        run: npm audit --audit-level=high

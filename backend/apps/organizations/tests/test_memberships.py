@@ -33,9 +33,7 @@ class TestMembershipMutations:
         response = api_client.patch(f"/api/members/{dev_membership.pk}/", {"role": "qa"})
         assert response.status_code == 403
 
-    def test_admin_can_change_role(
-        self, admin_client, organization, make_user, make_membership
-    ):
+    def test_admin_can_change_role(self, admin_client, organization, make_user, make_membership):
         developer = make_user("dev@example.com")
         dev_membership = make_membership(organization, developer, role=CommunityRole.DEVELOPER)
 
