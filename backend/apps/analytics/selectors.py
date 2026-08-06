@@ -71,6 +71,22 @@ def _base_resolution_activity(
         organization=organization,
         verb=ActivityVerb.STATUS_CHANGED,
         to_value__in=RESOLUTION_STATUSES,
+        # bug__organization=organization is redundant with organization=
+        # above — a BugActivity's bug always belongs to the same
+        # organization by construction — but stating it explicitly gives
+        # the query planner a directly usable predicate on bugs_bug itself.
+        # Without it, confirmed via EXPLAIN ANALYZE against a
+        # 100,000-bug/5-organization performance dataset
+        # (docs/PERFORMANCE.md): the planner has no organization-scoped
+        # way to restrict the bugs_bug side of this join, and — once
+        # activities_verb_lookup_idx (added alongside this) made the
+        # BugActivity side of the join cheap enough — chose a Hash Join
+        # built from a full sequential scan of *every* organization's
+        # non-archived bugs (regressing this query from ~20ms to ~43ms).
+        # With this filter present, the planner instead restricts
+        # bugs_bug to this organization first, via its own existing
+        # (organization, archived_at, created_at) index.
+        bug__organization=organization,
         bug__archived_at__isnull=True,
         bug__project__archived_at__isnull=True,
     )

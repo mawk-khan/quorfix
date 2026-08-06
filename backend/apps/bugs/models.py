@@ -1,6 +1,8 @@
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
 from django.db.models import F, Q
+from django.db.models.functions import Upper
 
 from apps.core.models import OrganizationScopedModel
 
@@ -134,6 +136,25 @@ class Bug(OrganizationScopedModel):
             models.Index(fields=["organization", "severity"]),
             models.Index(fields=["organization", "due_date"]),
             models.Index(fields=["organization", "resolved_at"]),
+            # Backs apps.bugs.selectors.list_bugs' `search` filter
+            # (title__icontains / key__icontains) — confirmed via EXPLAIN
+            # ANALYZE against a 100,000-bug performance dataset
+            # (docs/PERFORMANCE.md) to otherwise fall back to a full
+            # post-filter scan of every bug in the organization. Built on
+            # UPPER(title)/UPPER(key) specifically because Django compiles
+            # icontains on this database to UPPER(col) LIKE UPPER(pattern),
+            # not a bare ILIKE — a plain (non-expression) trigram index on
+            # the raw column would never be selected by the planner for
+            # that expression. pg_trgm itself is enabled by the paired
+            # migration (0003_bug_search_trigram_indexes).
+            GinIndex(
+                OpClass(Upper("title"), name="gin_trgm_ops"),
+                name="bugs_bug_title_upper_trgm",
+            ),
+            GinIndex(
+                OpClass(Upper("key"), name="gin_trgm_ops"),
+                name="bugs_bug_key_upper_trgm",
+            ),
         ]
 
     def __str__(self) -> str:

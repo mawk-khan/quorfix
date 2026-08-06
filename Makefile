@@ -1,7 +1,8 @@
 .PHONY: seed-demo prod-config prod-build prod-up prod-down prod-check prod-migrate \
 	backup backup-db backup-attachments restore-db-confirm restore-attachments-confirm \
 	prod-migrations-check prod-migrations-plan prod-upgrade-check prod-version upgrade-smoke \
-	ci-backend ci-frontend ci-e2e ci-images openapi-check community-check
+	ci-backend ci-frontend ci-e2e ci-images openapi-check community-check \
+	perf-seed-small perf-measure perf-clean-confirm perf-seed-full-confirm
 
 # Seeds local development demo data (organization, one user per Community
 # role, three projects). Development-only — refuses to run under production
@@ -174,3 +175,38 @@ community-check:
 		apps/attachments/tests/test_community_isolation.py \
 		apps/comments/tests/test_community_isolation.py \
 		apps/notifications/tests/test_community_isolation.py -v
+
+# --- Performance testing (docs/PERFORMANCE.md) -----------------------------
+#
+# generate_perf_dataset refuses to run at all without BUGFIXER_DISPOSABLE_DATABASE=true
+# — set only for the single command below, never in .env — plus its own further
+# checks (production settings, database name, demo/E2E organizations present).
+# Point the running stack at a database you are prepared to lose entirely
+# before using perf-seed-small or perf-seed-full-confirm; see
+# docs/PERFORMANCE.md "Safety warnings" for the full model. Requires
+# docker-compose.yml's backend already running.
+
+# Small, safe default dataset: 1 organization, ~1,000 bugs.
+perf-seed-small:
+	docker compose exec -e BUGFIXER_DISPOSABLE_DATABASE=true backend \
+		python manage.py generate_perf_dataset
+
+# Runs every measurement scenario (read-only) against the most recently
+# generated perf-owned organization and prints timing/query-count stats.
+perf-measure:
+	docker compose exec backend python manage.py measure_performance \
+		--runs 10 --warmup-runs 2 --include-sql
+
+# Deletes every perf-owned organization (slug prefix "perf-") and nothing
+# else — see docs/PERFORMANCE.md "Ownership marker".
+perf-clean-confirm:
+	docker compose exec -e BUGFIXER_DISPOSABLE_DATABASE=true backend \
+		python manage.py generate_perf_dataset --cleanup-existing-perf-data --confirm-disposable-database
+
+# Full ~100,000-bug dataset (5 organizations, ~2-3 minutes). Requires BOTH
+# --full and --confirm-disposable-database on top of
+# BUGFIXER_DISPOSABLE_DATABASE=true — never run this against anything but a
+# disposable database.
+perf-seed-full-confirm:
+	docker compose exec -e BUGFIXER_DISPOSABLE_DATABASE=true backend \
+		python manage.py generate_perf_dataset --full --confirm-disposable-database

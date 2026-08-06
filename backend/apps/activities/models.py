@@ -64,6 +64,19 @@ class BugActivity(UUIDPrimaryKeyModel):
             # serve that ORDER BY since `bug` sits between the two columns
             # it would need to be adjacent for.
             models.Index(fields=["organization", "-created_at"]),
+            # apps.analytics.selectors._base_resolution_activity (backing
+            # the dashboard's resolved-count, trends, and cache-miss
+            # recompute paths) filters on organization + verb + to_value +
+            # a created_at range, none of which the two indexes above
+            # cover beyond the leading organization column — confirmed via
+            # EXPLAIN ANALYZE against a 100,000-bug/300,000-activity
+            # performance dataset (docs/PERFORMANCE.md) to fall back to a
+            # Bitmap Heap Scan that filters ~18,000 rows per query instead
+            # of using an index for the verb/to_value/date narrowing.
+            models.Index(
+                fields=["organization", "verb", "to_value", "created_at"],
+                name="activities_verb_lookup_idx",
+            ),
         ]
         ordering = ["-created_at", "-id"]
 
