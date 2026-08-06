@@ -43,6 +43,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Serves STATIC_ROOT directly from the WSGI process — there is no
+    # separate reverse proxy or CDN in front of gunicorn in this cloud-
+    # neutral setup. Harmless in development/test too: it only serves files
+    # that exist under STATIC_ROOT and falls through otherwise, and
+    # STATIC_ROOT is only ever populated by `collectstatic`, which nothing
+    # in dev/test runs. Immediately after SecurityMiddleware per WhiteNoise's
+    # own documented placement.
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

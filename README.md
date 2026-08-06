@@ -82,6 +82,24 @@ frontend/           Next.js App Router project
 
 API documentation (OpenAPI/Swagger) is served at `/api/docs/` once the backend is running.
 
+## Production
+
+`docker-compose.prod.yml` is a cloud-neutral, production-oriented example configuration —
+immutable, non-root application images; a named volume for local attachments shared by the
+backend and Celery worker; readiness/liveness checks; no source bind mounts. It does not
+replace `docker-compose.yml`, which remains the local-development configuration.
+
+```bash
+make prod-config   # validate the resolved configuration
+make prod-build    # build the production images
+make prod-up       # start db, redis, backend, celery_worker, frontend
+make prod-migrate  # explicit, separate step — never run automatically
+```
+
+A full production deployment guide, including backup/restore and upgrade procedures, is a
+later, dedicated documentation phase — this is the current state of the container setup, not
+a complete operations manual.
+
 ## Testing
 
 Backend:

@@ -10,6 +10,12 @@ const backendInternalUrl = process.env.BACKEND_INTERNAL_URL ?? "http://localhost
 const allowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(",").filter(Boolean);
 
 const nextConfig: NextConfig = {
+  // Traced, minimal-dependency build output (.next/standalone) used by the
+  // production Docker image (frontend/Dockerfile's `runner` stage) — a
+  // self-contained server.js plus only the node_modules that build actually
+  // traced as used, instead of the full node_modules tree. No effect on
+  // `next dev` or plain `next build && next start` outside Docker.
+  output: "standalone",
   ...(allowedDevOrigins?.length ? { allowedDevOrigins } : {}),
   // Django's URLs use a trailing slash (APPEND_SLASH). Next's default
   // trailing-slash redirect runs before rewrites and would fight with that,

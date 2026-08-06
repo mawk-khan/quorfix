@@ -14,7 +14,24 @@ DEBUG = False
 
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_SECURE = True
-SECURE_SSL_REDIRECT = True
+
+# Defaults to True — the safe assumption for a backend directly fronted by
+# its own dedicated TLS-terminating reverse proxy. docker-compose.prod.yml's
+# topology is different: the frontend is the sole edge service (only it
+# publishes a port), and the backend is only ever reached over plain HTTP by
+# the frontend's internal API proxy and by Celery — both purely internal,
+# trusted-Docker-network traffic that never leaves the host. Redirecting
+# that internal traffic to HTTPS (which doesn't exist inside the Docker
+# network) would break every proxied API call, not just this setting's own
+# purpose — so docker-compose.prod.yml explicitly sets
+# DJANGO_SECURE_SSL_REDIRECT=false for exactly that reason. This does not
+# weaken browser-facing security: SESSION_COOKIE_SECURE/CSRF_COOKIE_SECURE
+# above are unaffected (the browser only ever observes whatever protocol the
+# operator's own reverse proxy serves the frontend over, never this
+# internal hop), and the backend's port is never published, so there is no
+# direct-plain-HTTP-to-Django attack surface for this setting to protect
+# against in that topology in the first place.
+SECURE_SSL_REDIRECT = get_bool("DJANGO_SECURE_SSL_REDIRECT", True)
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
 SECURE_HSTS_PRELOAD = True
@@ -33,3 +50,14 @@ EMAIL_PORT = get_int("EMAIL_PORT", 587)
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = get_bool("EMAIL_USE_TLS", True)
+
+# Hashed, compressed filenames (cache-busting) + gzip/brotli precompression,
+# resolved from the manifest `collectstatic` writes into STATIC_ROOT at
+# image build time (see the Dockerfile's `collectstatic` stage). Only safe
+# to use where that manifest is guaranteed to exist — development/test never
+# run collectstatic, so they keep Django's plain default storage from
+# base.py instead.
+STORAGES = {
+    "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+}

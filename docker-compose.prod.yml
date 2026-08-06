@@ -1,0 +1,225 @@
+# Production-oriented example Compose configuration. Cloud-neutral: no
+# managed database, load balancer, or reverse proxy is assumed — an operator
+# fronting this with their own TLS-terminating reverse proxy is expected to
+# point it at the frontend service's published port.
+#
+# Does not replace docker-compose.yml (local development). Use:
+#   docker compose -f docker-compose.prod.yml --env-file .env <command>
+# or the equivalent `make prod-*` targets (see Makefile).
+#
+# All five services share one Compose-created bridge network. Only the
+# frontend publishes a host port — db/redis/backend are reachable from each
+# other over that shared network but never from outside the Docker host,
+# which is the actual security boundary here (not Compose's `internal: true`
+# network flag, which is deliberately not used: it would also have to be
+# proven not to interfere with the frontend's own published port, and
+# selective port publishing alone already achieves the requirement without
+# that risk).
+
+name: bug-fixer-prod
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bugfixer}
+      POSTGRES_USER: ${POSTGRES_USER:-bugfixer}
+      # No insecure default — docker compose itself refuses to start if this
+      # is unset or empty, rather than silently booting Postgres with a
+      # blank/well-known password.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env for production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bugfixer}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # No host port published — only `backend`/`celery_worker`, on the same
+    # Compose network, ever need to reach Postgres.
+
+  redis:
+    image: redis:7-alpine
+    # Basic RDB snapshotting to the named volume below, so a routine
+    # container recreation doesn't silently drop in-flight Celery task
+    # messages and throttle counters. This is operational cache/queue state,
+    # not a system of record — Postgres (with its own backup/restore
+    # process, a later Phase 6 chunk) is the actual source of truth for
+    # everything that matters durably. Redis auth is not enabled by default
+    # (the internal-network-only exposure below is the primary control
+    # here); an operator whose threat model needs it can add
+    # `--requirepass` via a command override and switch REDIS_URL to
+    # `redis://:<password>@redis:6379/0` — the application already parses
+    # that URL form with no code changes needed.
+    command: ["redis-server", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    # No host port published — Redis is never meant to be reachable from
+    # outside the Docker host.
+
+  backend:
+    image: bugfixer-backend:${VERSION:-local}
+    build:
+      context: ./backend
+      # No `target:` — builds the Dockerfile's default (final) stage, the
+      # non-root `production` stage. Never the `dev` stage docker-compose.yml
+      # uses.
+      args:
+        VERSION: ${VERSION:-local}
+        VCS_REF: ${VCS_REF:-unknown}
+    env_file:
+      - .env
+    environment:
+      # Hardcoded rather than left to whatever DJANGO_SETTINGS_MODULE
+      # happens to be in .env — anyone running this file has already
+      # declared "this is production" by that choice, and it must not
+      # depend on also remembering to set this correctly in a shared .env.
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      # Matches the Dockerfile's baked, chowned directory — not
+      # backend/config/settings/base.py's dev-oriented default of
+      # <repo>/backend/media, which doesn't exist as a writable path for the
+      # non-root runtime user without the volume mounted there instead.
+      ATTACHMENTS_LOCAL_ROOT: /data/attachments
+      # This topology's backend is never directly internet-facing (no
+      # published port below) — the frontend is the sole edge service, and
+      # the only traffic reaching the backend is the frontend's internal API
+      # proxy and this file's own healthcheck, both plain HTTP over the
+      # trusted Compose network. Forcing an HTTPS redirect on that internal
+      # traffic would break it outright (there is no TLS inside the Docker
+      # network to redirect to). See config/settings/production.py for the
+      # full reasoning and why this does not weaken browser-facing cookie
+      # security.
+      DJANGO_SECURE_SSL_REDIRECT: "false"
+    volumes:
+      # Named volume only — no source bind mount. See "Persistent
+      # attachments" below; the same volume/path is also mounted by
+      # celery_worker.
+      - attachments_data:/data/attachments
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      # Readiness, not liveness: Compose has only one healthcheck slot per
+      # service, and its most useful job here is gating `depends_on:
+      # condition: service_healthy` for the frontend below — which should
+      # wait until the backend can actually serve a request, not merely
+      # that the process launched. (A real liveness/readiness *split*, e.g.
+      # under Kubernetes, would use /api/health/ and /api/health/ready/
+      # separately, exactly as those two endpoints are designed for.)
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health/ready/', timeout=3)",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    # gunicorn's own default graceful_timeout is 30s (see gunicorn.conf.py);
+    # give it that same window before Docker sends SIGKILL.
+    stop_grace_period: 30s
+    # No host port published — the frontend is the sole edge service; it
+    # reaches the backend over the internal Compose network via
+    # BACKEND_INTERNAL_URL, never through a published port.
+
+  celery_worker:
+    image: bugfixer-backend:${VERSION:-local}
+    build:
+      context: ./backend
+      args:
+        VERSION: ${VERSION:-local}
+        VCS_REF: ${VCS_REF:-unknown}
+    # Identical image tag + build context/args as `backend` above — Compose
+    # builds it once and both services use the same image, never two
+    # separately-built copies of the same source.
+    command: >-
+      celery -A config worker
+      --loglevel=${CELERY_WORKER_LOGLEVEL:-info}
+      --concurrency=${CELERY_WORKER_CONCURRENCY:-2}
+    env_file:
+      - .env
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.production
+      POSTGRES_HOST: db
+      REDIS_URL: redis://redis:6379/0
+      # Same path as `backend`, mounting the same named volume below — a
+      # hard requirement, not a convenience: the worker and the web process
+      # must agree on where an uploaded file actually lives.
+      ATTACHMENTS_LOCAL_ROOT: /data/attachments
+      # Irrelevant to Celery itself (it never serves HTTP), but kept
+      # identical to `backend`'s environment for consistency and because
+      # both share the exact same settings module.
+      DJANGO_SECURE_SSL_REDIRECT: "false"
+    volumes:
+      - attachments_data:/data/attachments
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A config inspect ping -d celery@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+    # Longer than the web service's: a warm Celery shutdown finishes
+    # whatever task is already executing (e.g. an in-progress email send
+    # with its own retry/backoff timing) before exiting, which can
+    # legitimately take longer than an HTTP request.
+    stop_grace_period: 60s
+
+  frontend:
+    image: bugfixer-frontend:${VERSION:-local}
+    build:
+      context: ./frontend
+      # No `target:` — builds the Dockerfile's default (final) `runner`
+      # stage, never `dev`.
+      args:
+        VERSION: ${VERSION:-local}
+        VCS_REF: ${VCS_REF:-unknown}
+        # Baked in at build time, not just passed at runtime below — see
+        # the long comment in frontend/Dockerfile's `builder` stage for why
+        # a runtime-only environment: override here is silently ignored by
+        # Next's standalone output.
+        BACKEND_INTERNAL_URL: http://backend:8000
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8000
+    depends_on:
+      backend:
+        # No deadlock risk: backend's own healthcheck/dependencies never
+        # reference frontend, so this is a one-directional wait, not a
+        # cycle.
+        condition: service_healthy
+    # Healthcheck comes from the image's own Dockerfile HEALTHCHECK
+    # instruction (a plain GET / via Node's built-in fetch) — deliberately
+    # not redefined here to depend on the backend, so Compose never
+    # considers a genuinely-fine frontend container "unhealthy" purely
+    # because of a backend-side outage.
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres_data:
+  redis_data:
+  # Backup/restore procedures for this volume are documented in a later
+  # Phase 6 chunk — for now, see the "Persistent attachments" note above:
+  # the same volume is mounted by both backend and celery_worker at
+  # /data/attachments.
+  attachments_data:

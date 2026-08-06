@@ -5,4 +5,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 staticfiles/
+media/
 .env
+*.sqlite3
+.bash_history
