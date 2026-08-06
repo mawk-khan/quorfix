@@ -1,7 +1,7 @@
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
-from apps.core.env import get_bool, get_int, get_list
+from apps.core.env import get_bool, get_choice, get_int, get_list, get_log_level
 
 
 class TestGetBool:
@@ -95,3 +95,55 @@ class TestGetInt:
         GUNICORN_WORKERS/GUNICORN_TIMEOUT were left blank."""
         monkeypatch.setenv("SOME_INT", "")
         assert get_int("SOME_INT", 42) == 42
+
+
+class TestGetChoice:
+    _CHOICES = ("json", "text", "plain")
+
+    def test_missing_returns_default(self, monkeypatch):
+        monkeypatch.delenv("SOME_CHOICE", raising=False)
+        assert get_choice("SOME_CHOICE", "json", self._CHOICES) == "json"
+
+    def test_accepts_an_exact_choice(self, monkeypatch):
+        monkeypatch.setenv("SOME_CHOICE", "text")
+        assert get_choice("SOME_CHOICE", "json", self._CHOICES) == "text"
+
+    def test_case_insensitive_but_normalizes_to_the_declared_spelling(self, monkeypatch):
+        monkeypatch.setenv("SOME_CHOICE", "TEXT")
+        assert get_choice("SOME_CHOICE", "json", self._CHOICES) == "text"
+
+    def test_present_but_empty_is_treated_as_unset(self, monkeypatch):
+        monkeypatch.setenv("SOME_CHOICE", "")
+        assert get_choice("SOME_CHOICE", "json", self._CHOICES) == "json"
+
+    def test_unknown_value_raises(self, monkeypatch):
+        monkeypatch.setenv("SOME_CHOICE", "xml")
+        with pytest.raises(ImproperlyConfigured):
+            get_choice("SOME_CHOICE", "json", self._CHOICES)
+
+    def test_error_message_never_suggests_an_import_path(self, monkeypatch):
+        """This helper's whole reason for existing (Chunk J §15: "Do not
+        allow arbitrary import paths from environment values") is that a
+        malformed value is rejected outright, not resolved to a class/module
+        — the error message itself must only ever mention the fixed choice
+        set, never anything resembling a dotted import path."""
+        monkeypatch.setenv("SOME_CHOICE", "apps.evil.PayloadFormatter")
+        with pytest.raises(ImproperlyConfigured) as exc_info:
+            get_choice("SOME_CHOICE", "json", self._CHOICES)
+        assert str(self._CHOICES) in str(exc_info.value)
+
+
+class TestGetLogLevel:
+    def test_missing_returns_default(self, monkeypatch):
+        monkeypatch.delenv("SOME_LEVEL", raising=False)
+        assert get_log_level("SOME_LEVEL", "INFO") == "INFO"
+
+    @pytest.mark.parametrize("raw", ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "warning"])
+    def test_accepts_every_standard_level(self, monkeypatch, raw):
+        monkeypatch.setenv("SOME_LEVEL", raw)
+        assert get_log_level("SOME_LEVEL", "INFO") == raw.upper()
+
+    def test_rejects_a_nonstandard_level(self, monkeypatch):
+        monkeypatch.setenv("SOME_LEVEL", "TRACE")
+        with pytest.raises(ImproperlyConfigured):
+            get_log_level("SOME_LEVEL", "INFO")

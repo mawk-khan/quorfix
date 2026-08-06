@@ -3,6 +3,7 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 
+from apps.core.task_correlation import correlation_headers
 from apps.notifications.models import (
     COMMENT_REQUIRED_EVENT_TYPES,
     Notification,
@@ -52,14 +53,17 @@ def notify(
         from apps.notifications.tasks import create_notifications_for_event
 
         try:
-            create_notifications_for_event.delay(
-                event_type=event_type,
-                organization_id=str(organization_id),
-                bug_id=str(bug_id),
-                actor_id=str(actor_id) if actor_id else None,
-                activity_id=str(activity_id) if activity_id else None,
-                comment_id=str(comment_id) if comment_id else None,
-                assignee_id=str(assignee_id) if assignee_id else None,
+            create_notifications_for_event.apply_async(
+                kwargs=dict(
+                    event_type=event_type,
+                    organization_id=str(organization_id),
+                    bug_id=str(bug_id),
+                    actor_id=str(actor_id) if actor_id else None,
+                    activity_id=str(activity_id) if activity_id else None,
+                    comment_id=str(comment_id) if comment_id else None,
+                    assignee_id=str(assignee_id) if assignee_id else None,
+                ),
+                headers=correlation_headers(),
             )
         except Exception:
             logger.exception(

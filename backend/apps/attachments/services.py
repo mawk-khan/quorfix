@@ -8,7 +8,7 @@ from django.utils import timezone
 from apps.attachments import policies, validators
 from apps.attachments.models import Attachment, AttachmentStatus
 from apps.attachments.policies import AttachmentPermissionDenied
-from apps.attachments.providers import get_storage_provider
+from apps.attachments.providers import get_storage_provider, hash_storage_key
 
 # Re-exported, not re-defined: validators.validate_content_type/validate_size
 # raise these directly, so services.py (and, through it, views.py's
@@ -18,6 +18,7 @@ from apps.attachments.validators import (  # noqa: F401 — re-exported for apps
     AttachmentTooLarge,
     UnsupportedContentType,
 )
+from apps.core.task_correlation import correlation_headers
 
 logger = logging.getLogger(__name__)
 
@@ -210,9 +211,9 @@ def get_download_path(*, attachment: Attachment):
     path = provider.resolve_download(attachment.storage_key)
     if path is None:
         logger.error(
-            "Attachment %s is marked uploaded but its storage object at %s is missing",
+            "Attachment %s is marked uploaded but its storage object (%s) is missing",
             attachment.id,
-            attachment.storage_key,
+            hash_storage_key(attachment.storage_key),
         )
         raise Http404()
     return path
@@ -256,12 +257,14 @@ def remove_attachment(*, bug, attachment: Attachment, actor, membership) -> Atta
         from apps.attachments.tasks import delete_attachment_object
 
         try:
-            delete_attachment_object.delay(storage_key)
+            delete_attachment_object.apply_async(args=[storage_key], headers=correlation_headers())
         except Exception:
             # A broker outage must never surface as a failure of the removal
             # itself — the DB state (removed_at) already committed by the
             # time this callback runs.
-            logger.exception("Failed to dispatch attachment cleanup task for %s", storage_key)
+            logger.exception(
+                "Failed to dispatch attachment cleanup task for %s", hash_storage_key(storage_key)
+            )
 
     transaction.on_commit(_dispatch_cleanup)
     return locked

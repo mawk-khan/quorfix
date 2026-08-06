@@ -8,6 +8,7 @@ from django.utils import timezone
 
 from apps.bugs.models import Bug
 from apps.comments.models import Comment
+from apps.core.task_correlation import correlation_headers, task_correlation_context
 from apps.notifications import resolvers
 from apps.notifications.models import Notification, NotificationEmailStatus, NotificationEventType
 from apps.notifications.services import is_email_enabled
@@ -70,86 +71,94 @@ def create_notifications_for_event(
     attempt's INSERT is rejected by the constraint and get_or_create falls
     back to the existing row.
     """
-    organization = Organization.objects.filter(pk=organization_id).first()
-    bug = (
-        Bug.objects.filter(pk=bug_id, organization_id=organization_id)
-        .select_related("project")
-        .first()
-    )
-    if organization is None or bug is None:
-        # Tenant mismatch or the source objects are gone — should be
-        # structurally impossible given the call sites (bugs/comments
-        # services only ever dispatch with their own organization_id/bug_id
-        # right after committing them), but this task never trusts its own
-        # arguments blindly.
-        logger.warning(
-            "create_notifications_for_event: no bug %s in organization %s — dropping event %s",
-            bug_id,
-            organization_id,
-            event_type,
-        )
-        return
-
-    actor = None
-    if actor_id:
-        from django.contrib.auth import get_user_model
-
-        actor = get_user_model().objects.filter(pk=actor_id).first()
-
-    comment = None
-    if comment_id:
-        comment = (
-            Comment.objects.filter(pk=comment_id, organization_id=organization_id)
-            .select_related("organization")
+    with task_correlation_context(self):
+        organization = Organization.objects.filter(pk=organization_id).first()
+        bug = (
+            Bug.objects.filter(pk=bug_id, organization_id=organization_id)
+            .select_related("project")
             .first()
         )
-
-    recipients = _resolve_recipients(
-        event_type=event_type, bug=bug, comment=comment, actor_id=actor_id, assignee_id=assignee_id
-    )
-    if not recipients:
-        return
-
-    source_id = activity_id or comment_id
-    dedup_key = f"{event_type}:{source_id}"
-
-    newly_created_pending_ids = []
-    with transaction.atomic():
-        for recipient in recipients:
-            email_enabled = is_email_enabled(
-                organization=organization, user=recipient, event_type=event_type
+        if organization is None or bug is None:
+            # Tenant mismatch or the source objects are gone — should be
+            # structurally impossible given the call sites (bugs/comments
+            # services only ever dispatch with their own organization_id/bug_id
+            # right after committing them), but this task never trusts its own
+            # arguments blindly.
+            logger.warning(
+                "create_notifications_for_event: no bug %s in organization %s — dropping event %s",
+                bug_id,
+                organization_id,
+                event_type,
             )
-            notification, created = Notification.objects.get_or_create(
-                organization=organization,
-                recipient=recipient,
-                dedup_key=dedup_key,
-                defaults={
-                    "event_type": event_type,
-                    "actor": actor,
-                    "bug": bug,
-                    "comment": comment,
-                    "email_status": (
-                        NotificationEmailStatus.PENDING
-                        if email_enabled
-                        else NotificationEmailStatus.DISABLED
-                    ),
-                },
-            )
-            if created and notification.email_status == NotificationEmailStatus.PENDING:
-                newly_created_pending_ids.append(notification.id)
+            return
 
-    # Dispatched only after the block above has committed — each dispatch is
-    # independent so one broker failure can't skip the rest, and a broker
-    # outage here must never roll back or otherwise touch the Notification
-    # rows already committed above (they stay PENDING; nothing marks them
-    # sent, nothing deletes them).
-    for notification_id in newly_created_pending_ids:
-        try:
-            send_notification_email.delay(str(notification_id))
-        except Exception:
-            logger.exception(
-                "Failed to dispatch send_notification_email for notification %s", notification_id
+        actor = None
+        if actor_id:
+            from django.contrib.auth import get_user_model
+
+            actor = get_user_model().objects.filter(pk=actor_id).first()
+
+        comment = None
+        if comment_id:
+            comment = (
+                Comment.objects.filter(pk=comment_id, organization_id=organization_id)
+                .select_related("organization")
+                .first()
             )
+
+        recipients = _resolve_recipients(
+            event_type=event_type,
+            bug=bug,
+            comment=comment,
+            actor_id=actor_id,
+            assignee_id=assignee_id,
+        )
+        if not recipients:
+            return
+
+        source_id = activity_id or comment_id
+        dedup_key = f"{event_type}:{source_id}"
+
+        newly_created_pending_ids = []
+        with transaction.atomic():
+            for recipient in recipients:
+                email_enabled = is_email_enabled(
+                    organization=organization, user=recipient, event_type=event_type
+                )
+                notification, created = Notification.objects.get_or_create(
+                    organization=organization,
+                    recipient=recipient,
+                    dedup_key=dedup_key,
+                    defaults={
+                        "event_type": event_type,
+                        "actor": actor,
+                        "bug": bug,
+                        "comment": comment,
+                        "email_status": (
+                            NotificationEmailStatus.PENDING
+                            if email_enabled
+                            else NotificationEmailStatus.DISABLED
+                        ),
+                    },
+                )
+                if created and notification.email_status == NotificationEmailStatus.PENDING:
+                    newly_created_pending_ids.append(notification.id)
+
+        # Dispatched only after the block above has committed — each dispatch
+        # is independent so one broker failure can't skip the rest, and a
+        # broker outage here must never roll back or otherwise touch the
+        # Notification rows already committed above (they stay PENDING;
+        # nothing marks them sent, nothing deletes them).
+        for notification_id in newly_created_pending_ids:
+            try:
+                send_notification_email.apply_async(
+                    args=[str(notification_id)], headers=correlation_headers()
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to dispatch send_notification_email for notification %s",
+                    notification_id,
+                )
 
 
 def _mark_email_failed(notification_id, exc: Exception) -> None:
@@ -206,34 +215,37 @@ def send_notification_email(self, notification_id):
     single statement, and logging loudly (not silently) if that UPDATE ever
     affects zero rows.
     """
-    notification = (
-        Notification.objects.select_related("recipient", "bug").filter(pk=notification_id).first()
-    )
-    if notification is None or notification.email_status != NotificationEmailStatus.PENDING:
-        return
-
-    try:
-        _send_email(notification)
-    except Exception as exc:
-        logger.warning(
-            "Notification %s email send failed (attempt %s/%s)",
-            notification_id,
-            self.request.retries + 1,
-            self.max_retries,
-            exc_info=exc,
+    with task_correlation_context(self):
+        notification = (
+            Notification.objects.select_related("recipient", "bug")
+            .filter(pk=notification_id)
+            .first()
         )
+        if notification is None or notification.email_status != NotificationEmailStatus.PENDING:
+            return
+
         try:
-            self.retry(exc=exc)
-        except self.MaxRetriesExceededError:
-            _mark_email_failed(notification_id, exc)
-        return
+            _send_email(notification)
+        except Exception as exc:
+            logger.warning(
+                "Notification %s email send failed (attempt %s/%s)",
+                notification_id,
+                self.request.retries + 1,
+                self.max_retries,
+                exc_info=exc,
+            )
+            try:
+                self.retry(exc=exc)
+            except self.MaxRetriesExceededError:
+                _mark_email_failed(notification_id, exc)
+            return
 
-    updated = Notification.objects.filter(
-        pk=notification_id, email_status=NotificationEmailStatus.PENDING
-    ).update(email_status=NotificationEmailStatus.SENT, emailed_at=timezone.now())
-    if not updated:
-        logger.warning(
-            "Notification %s email_status changed concurrently before the successful send "
-            "could be recorded — the email was still sent exactly once",
-            notification_id,
-        )
+        updated = Notification.objects.filter(
+            pk=notification_id, email_status=NotificationEmailStatus.PENDING
+        ).update(email_status=NotificationEmailStatus.SENT, emailed_at=timezone.now())
+        if not updated:
+            logger.warning(
+                "Notification %s email_status changed concurrently before the successful send "
+                "could be recorded — the email was still sent exactly once",
+                notification_id,
+            )

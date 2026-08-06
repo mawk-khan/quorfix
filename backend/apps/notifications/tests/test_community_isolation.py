@@ -57,7 +57,7 @@ def test_full_notification_lifecycle_works_with_professional_absent(
     INSTALLED_APPS.
 
     Forces Celery eager mode explicitly rather than relying on the ambient
-    DJANGO_SETTINGS_MODULE: create_notifications_for_event.delay is real
+    DJANGO_SETTINGS_MODULE: create_notifications_for_event.apply_async is real
     (unmocked) here, and config.celery.app reads CELERY_TASK_ALWAYS_EAGER
     from Django settings at call time (see
     test_transaction_dispatch.test_celery_app_observes_override_settings_dynamically
@@ -67,7 +67,7 @@ def test_full_notification_lifecycle_works_with_professional_absent(
     original failure this test was written to fix, and the reason
     transaction.on_commit itself was never the problem (it already fires
     correctly under django_db(transaction=True))."""
-    with patch("apps.notifications.tasks.send_notification_email.delay"):
+    with patch("apps.notifications.tasks.send_notification_email.apply_async"):
         assign_response = admin_client.post(
             f"/api/bugs/{bug.pk}/assign/",
             {"assignee": str(developer_user.pk), "version": bug.version},

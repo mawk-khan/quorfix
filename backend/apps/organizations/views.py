@@ -1,3 +1,5 @@
+import logging
+
 from django.conf import settings
 from django.contrib.auth import login
 from django.core.mail import send_mail
@@ -10,6 +12,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import GenericViewSet
 
+from apps.core.context import bind_actor_context
 from apps.organizations.permissions import IsOrganizationAdministrator, IsOrganizationMember
 from apps.organizations.selectors import get_organization_members, get_pending_invitations
 from apps.organizations.serializers import (
@@ -38,6 +41,8 @@ from apps.organizations.services import (
     revoke_invitation,
     setup_instance,
 )
+
+logger = logging.getLogger(__name__)
 
 
 @method_decorator(ensure_csrf_cookie, name="dispatch")
@@ -91,7 +96,7 @@ class SetupView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            user, _organization, _membership = setup_instance(
+            user, organization, _membership = setup_instance(
                 organization_name=serializer.validated_data["organization_name"],
                 email=serializer.validated_data["email"],
                 password=serializer.validated_data["password"],
@@ -99,11 +104,13 @@ class SetupView(APIView):
                 last_name=serializer.validated_data["last_name"],
             )
         except SetupAlreadyCompleted:
+            logger.warning("Instance setup rejected: already configured")
             return Response(
                 {"detail": "This instance is already configured."},
                 status=status.HTTP_409_CONFLICT,
             )
         except SetupNotAllowed:
+            logger.warning("Instance setup rejected: not allowed")
             return Response(
                 {"detail": "Creating an organization is not allowed."},
                 status=status.HTTP_409_CONFLICT,
@@ -113,6 +120,8 @@ class SetupView(APIView):
         # more than one entry and these users were created directly (not via
         # authenticate(), which normally stamps user.backend as a side effect).
         login(request, user, backend="apps.accounts.backends.EmailAuthBackend")
+        bind_actor_context(user_id=user.id, organization_id=organization.id)
+        logger.info("Instance setup completed")
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -255,13 +264,17 @@ class InvitationAcceptView(APIView):
         serializer.is_valid(raise_exception=True)
 
         try:
-            user, _membership = accept_invitation(
+            # `token` (the raw invitation token) is never passed to a logger
+            # call anywhere below — it's a bearer credential, same category
+            # as a password or session token.
+            user, membership = accept_invitation(
                 raw_token=token,
                 password=serializer.validated_data["password"],
                 first_name=serializer.validated_data["first_name"],
                 last_name=serializer.validated_data["last_name"],
             )
         except InvitationInvalid:
+            logger.warning("Invitation acceptance failed: invalid or expired")
             return Response(
                 {"detail": "This invitation is invalid or has expired."},
                 status=status.HTTP_404_NOT_FOUND,
@@ -271,4 +284,6 @@ class InvitationAcceptView(APIView):
         # more than one entry and these users were created directly (not via
         # authenticate(), which normally stamps user.backend as a side effect).
         login(request, user, backend="apps.accounts.backends.EmailAuthBackend")
+        bind_actor_context(user_id=user.id, organization_id=membership.organization_id)
+        logger.info("Invitation accepted")
         return Response(status=status.HTTP_204_NO_CONTENT)

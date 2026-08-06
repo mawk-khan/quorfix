@@ -30,7 +30,7 @@ class TestDispatchFromCreation:
         self, organization, admin_user, developer_user, developer_membership, bug
     ):
         bug.watchers.add(developer_user)
-        with patch("apps.notifications.tasks.send_notification_email.delay") as mock_delay:
+        with patch("apps.notifications.tasks.send_notification_email.apply_async") as mock_delay:
             create_notifications_for_event.apply(
                 kwargs=dict(
                     event_type=NotificationEventType.STATUS_CHANGED,
@@ -42,7 +42,7 @@ class TestDispatchFromCreation:
             )
         mock_delay.assert_called_once()
         notification = Notification.objects.get(organization=organization, recipient=developer_user)
-        assert str(notification.id) == mock_delay.call_args.args[0]
+        assert str(notification.id) == mock_delay.call_args.kwargs["args"][0]
 
     def test_repeated_execution_does_not_dispatch_another_email_for_an_existing_notification(
         self, organization, admin_user, developer_user, developer_membership, bug
@@ -56,7 +56,7 @@ class TestDispatchFromCreation:
             actor_id=str(admin_user.pk),
             activity_id=activity_id,
         )
-        with patch("apps.notifications.tasks.send_notification_email.delay") as mock_delay:
+        with patch("apps.notifications.tasks.send_notification_email.apply_async") as mock_delay:
             create_notifications_for_event.apply(kwargs=kwargs)
             create_notifications_for_event.apply(kwargs=kwargs)
         mock_delay.assert_called_once()
@@ -73,7 +73,7 @@ class TestDispatchFromCreation:
             email_enabled=False,
         )
         bug.watchers.add(developer_user)
-        with patch("apps.notifications.tasks.send_notification_email.delay") as mock_delay:
+        with patch("apps.notifications.tasks.send_notification_email.apply_async") as mock_delay:
             create_notifications_for_event.apply(
                 kwargs=dict(
                     event_type=NotificationEventType.STATUS_CHANGED,
@@ -93,7 +93,7 @@ class TestDispatchFromCreation:
         bug.watchers.add(developer_user)
         with (
             patch(
-                "apps.notifications.tasks.send_notification_email.delay",
+                "apps.notifications.tasks.send_notification_email.apply_async",
                 side_effect=ConnectionError("broker unreachable"),
             ),
             caplog.at_level(logging.ERROR),

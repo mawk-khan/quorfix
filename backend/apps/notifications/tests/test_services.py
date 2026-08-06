@@ -139,7 +139,9 @@ class TestNotifyDispatch:
     def test_dispatches_after_commit(self, organization, admin_user, bug):
         from unittest.mock import patch
 
-        with patch("apps.notifications.tasks.create_notifications_for_event.delay") as mock_delay:
+        with patch(
+            "apps.notifications.tasks.create_notifications_for_event.apply_async"
+        ) as mock_delay:
             notify(
                 event_type=NotificationEventType.STATUS_CHANGED,
                 organization_id=organization.pk,
@@ -153,7 +155,7 @@ class TestNotifyDispatch:
         from unittest.mock import patch
 
         with patch(
-            "apps.notifications.tasks.create_notifications_for_event.delay",
+            "apps.notifications.tasks.create_notifications_for_event.apply_async",
             side_effect=ConnectionError("broker unreachable"),
         ):
             notify(

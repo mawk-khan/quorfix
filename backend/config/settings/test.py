@@ -1,3 +1,6 @@
+from apps.core.env import get_choice, get_log_level
+from apps.core.log_context import build_logging_config
+
 from .base import *  # noqa: F403
 
 ENVIRONMENT = "test"
@@ -7,6 +10,15 @@ SECRET_KEY = "test-secret-key"
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_BROKER_URL = "memory://"
+
+# Plain/readable and quiet by default — pytest's own capture (caplog) reads
+# LogRecords directly regardless of formatter, so this only controls what a
+# human sees when a test fails and pytest prints captured log output.
+# Individual tests that need to assert on INFO/DEBUG-level messages use
+# caplog.set_level(...) themselves rather than relying on this default.
+LOG_FORMAT = get_choice("LOG_FORMAT", "plain", ("json", "text", "plain"))
+LOG_LEVEL = get_log_level("LOG_LEVEL", "WARNING")
+LOGGING = build_logging_config(log_format=LOG_FORMAT, log_level=LOG_LEVEL)
 
 EMAIL_BACKEND = "django.core.mail.backends.locmem.EmailBackend"
 

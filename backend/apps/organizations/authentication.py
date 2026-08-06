@@ -1,5 +1,6 @@
 from rest_framework.authentication import SessionAuthentication
 
+from apps.core.context import bind_actor_context
 from apps.organizations.models import OrganizationMembership
 
 
@@ -25,4 +26,12 @@ class OrganizationAwareSessionAuthentication(SessionAuthentication):
             )
             request.organization = membership.organization if membership else None
             request.membership = membership
+            # Safe to bind here specifically: user/membership are already
+            # resolved above (no extra query), and this never runs for an
+            # anonymous request — see apps.core.context's own docstring for
+            # why this must never touch the database itself.
+            bind_actor_context(
+                user_id=user.id,
+                organization_id=request.organization.id if request.organization else None,
+            )
         return result

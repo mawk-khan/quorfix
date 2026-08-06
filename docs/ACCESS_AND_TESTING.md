@@ -558,6 +558,46 @@ affected by the date range", etc.) — the date filter never silently does nothi
   is still worth doing for the flows those 5 scenarios don't cover (e.g. comment editing,
   attachment upload, tag add/remove).
 
+### Phase 6 Chunk J: Structured logging, request correlation, and operational observability
+- **Status:** Complete
+- **Commit:** _(this change — update once committed)_
+- **Main functionality:** See `docs/OBSERVABILITY.md` for the full reference. Summary: every
+  HTTP request now gets a correlation ID (`X-Request-ID` request header when syntactically
+  safe, otherwise generated), echoed back on the response and attached to every log line
+  emitted during that request via a new `RequestIdMiddleware` + `RequestContextFilter`
+  (`backend/apps/core/middleware/request_id.py`, `backend/apps/core/log_context.py`).
+  Production logs are structured JSON by default (configurable via new `LOG_FORMAT`/
+  `LOG_LEVEL`/`SERVICE_NAME`/`REQUEST_ID_HEADER` settings); development/test stay
+  human-readable. Celery tasks (`create_notifications_for_event`, `send_notification_email`,
+  `delete_attachment_object`) now receive the dispatching request's correlation ID via task
+  headers (`apps.core.task_correlation`) — no task call signature or dedup-key behavior
+  changed. Added safe login/logout/setup/invitation-acceptance logging (no passwords, tokens,
+  or emails — see `docs/OBSERVABILITY.md` "Sensitive-data policy"). Attachment failure logs now
+  reference a non-reversible storage-key hash instead of the raw key. An automated static scan
+  (`backend/apps/core/tests/test_logging_security.py`) now fails CI if any future logger call
+  references a forbidden identifier (password, secret key, session/CSRF token, raw invitation
+  token). Optional request-completion timing log added
+  (`RequestLoggingMiddleware`: method, route, status, duration — never the query string or
+  body). No routes, roles, credentials, or demo data changed.
+- **URLs:** None (no new application-facing routes). `X-Request-ID` is a new request/response
+  header on every existing route.
+- **How to inspect logs:**
+  ```sh
+  docker compose logs -f backend         # application + Django + gunicorn.error
+  docker compose logs -f celery_worker   # Celery task logs
+  ```
+- **How to search by request ID:** read `X-Request-ID` from a response (browser DevTools →
+  Network → Response Headers, or `curl -i`), then:
+  ```sh
+  docker compose logs backend | grep '<request-id>'
+  ```
+  See `docs/OBSERVABILITY.md` "Troubleshooting examples" for the gunicorn-access-log and
+  Celery-task variants.
+- **Known limitations:** see `docs/OBSERVABILITY.md` "Known limitations" — gunicorn's access-log
+  correlation lives in the pre-rendered message text (a `rid=` atom), not a structured
+  `request_id` field, since that log line is written after `RequestIdMiddleware`'s own context
+  has already cleared; no metrics/tracing integration exists yet.
+
 ## Manual test checklist
 
 **First-run setup**
@@ -735,6 +775,14 @@ All services should show `Up`/`healthy`.
 ```bash
 docker compose logs -f backend
 ```
+
+**Find every log line for one failing request** — read `X-Request-ID` from the response
+(browser DevTools → Network → Response Headers), then:
+```bash
+docker compose logs backend | grep '<request-id>'
+```
+See `docs/OBSERVABILITY.md` for the full request-correlation reference (log format, Celery task
+correlation, sensitive-data policy).
 
 **Frontend logs**
 ```bash

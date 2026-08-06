@@ -154,12 +154,21 @@ def test_missing_storage_object_returns_404_and_logs(
     assert any("missing" in record.message for record in caplog.records)
     assert attachment.status == AttachmentStatus.UPLOADED  # DB row itself is untouched
 
-    # The response body itself (not just the status code) must never leak the
-    # absolute filesystem path — only the server log (asserted above) should
-    # carry it.
+    # Neither the response body nor the server log may carry the raw storage
+    # key or absolute filesystem path (Chunk J §7) — the log line instead
+    # carries a non-reversible hash of the key (see
+    # apps.attachments.providers.hash_storage_key), present so a specific
+    # object's failures can still be correlated across log lines without
+    # exposing the org/bug/attachment UUID structure the raw key embeds.
     from django.conf import settings
+
+    from apps.attachments.providers import hash_storage_key
 
     body = response.content.decode()
     assert settings.ATTACHMENTS_LOCAL_ROOT not in body
     assert str(attachment.storage_key) not in body
+    assert not any(str(attachment.storage_key) in record.message for record in caplog.records)
+    assert any(
+        hash_storage_key(attachment.storage_key) in record.getMessage() for record in caplog.records
+    )
     assert "/attachment-storage/" not in body

@@ -102,6 +102,13 @@ upgrade, migration, and rollback procedure. A full production deployment guide i
 dedicated documentation phase — this is the current state of the container setup, not a
 complete operations manual.
 
+## Observability
+
+Structured logs (JSON in production), a request correlation ID (`X-Request-ID`) threaded through
+every HTTP request and the Celery tasks it dispatches, and a documented sensitive-data policy —
+see [docs/OBSERVABILITY.md](./docs/OBSERVABILITY.md) for log format, correlation behavior across
+Django/Gunicorn/Celery, and troubleshooting examples. No external monitoring vendor is required.
+
 ## Testing
 
 Backend:

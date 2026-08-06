@@ -2,7 +2,7 @@
 Celery integration, and broker-failure isolation.
 
 Kept separate from test_event_wiring.py (which asserts *which* event type
-each domain mutation dispatches, with create_notifications_for_event.delay
+each domain mutation dispatches, with create_notifications_for_event.apply_async
 always mocked) and test_community_isolation.py (Professional-absence). This
 file is specifically about *when* apps.notifications.services.notify's
 transaction.on_commit callback fires relative to commit/rollback, and about
@@ -55,16 +55,19 @@ def test_celery_app_observes_override_settings_dynamically():
 
 class TestCommitDispatchScheduling:
     """notify()'s only job is to register a transaction.on_commit callback
-    that calls create_notifications_for_event.delay — these tests are about
-    *when* that callback fires relative to commit, not about what the real
-    Celery task does once it runs, so .delay is always mocked here."""
+    that calls create_notifications_for_event.apply_async — these tests are
+    about *when* that callback fires relative to commit, not about what the
+    real Celery task does once it runs, so .apply_async is always mocked
+    here."""
 
     @pytest.mark.django_db
     def test_dispatch_is_deferred_until_commit_and_carries_stable_ids(
         self, django_capture_on_commit_callbacks, organization, bug, admin_user, developer_user
     ):
         activity_id = uuid.uuid4()
-        with patch("apps.notifications.tasks.create_notifications_for_event.delay") as mock_delay:
+        with patch(
+            "apps.notifications.tasks.create_notifications_for_event.apply_async"
+        ) as mock_delay:
             with django_capture_on_commit_callbacks(execute=True) as callbacks:
                 notify(
                     event_type=NotificationEventType.BUG_ASSIGNED,
@@ -82,7 +85,12 @@ class TestCommitDispatchScheduling:
             assert len(callbacks) == 1
 
         mock_delay.assert_called_once()
-        kwargs = mock_delay.call_args.kwargs
+        # notify() dispatches via .apply_async(kwargs=..., headers=...) — not
+        # .delay(**kwargs) — specifically so it can propagate the current
+        # request's correlation ID as a task header. See
+        # apps.core.task_correlation.
+        assert mock_delay.call_args.kwargs["headers"] == {}
+        kwargs = mock_delay.call_args.kwargs["kwargs"]
         assert kwargs["event_type"] == NotificationEventType.BUG_ASSIGNED
         assert kwargs["organization_id"] == str(organization.id)
         assert kwargs["bug_id"] == str(bug.id)
@@ -102,7 +110,9 @@ class TestRollbackSuppressesDispatch:
         self, bug, admin_user, admin_membership, developer_user, developer_membership
     ):
         original_version = bug.version
-        with patch("apps.notifications.tasks.create_notifications_for_event.delay") as mock_delay:
+        with patch(
+            "apps.notifications.tasks.create_notifications_for_event.apply_async"
+        ) as mock_delay:
             with pytest.raises(RuntimeError):
                 with transaction.atomic():
                     assign_bug(
@@ -121,7 +131,7 @@ class TestRollbackSuppressesDispatch:
 
 
 class TestBrokerFailureIsolation:
-    """create_notifications_for_event.delay talking to a dead/unreachable
+    """create_notifications_for_event.apply_async talking to a dead/unreachable
     broker must never fail the bug/comment mutation that already committed
     by the time notify()'s on_commit callback runs — apps.notifications.
     services.notify's _dispatch swallows exactly this by design. Uses the
@@ -141,7 +151,7 @@ class TestBrokerFailureIsolation:
         developer_membership,
     ):
         with patch(
-            "apps.notifications.tasks.create_notifications_for_event.delay",
+            "apps.notifications.tasks.create_notifications_for_event.apply_async",
             side_effect=ConnectionError("broker unreachable"),
         ):
             with caplog.at_level(logging.ERROR, logger="apps.notifications.services"):
@@ -173,7 +183,7 @@ class TestBrokerFailureIsolation:
         admin_membership,
     ):
         with patch(
-            "apps.notifications.tasks.create_notifications_for_event.delay",
+            "apps.notifications.tasks.create_notifications_for_event.apply_async",
             side_effect=ConnectionError("broker unreachable"),
         ):
             with caplog.at_level(logging.ERROR, logger="apps.notifications.services"):
@@ -199,15 +209,15 @@ class TestEagerTaskIntegration:
     eager independent of the ambient DJANGO_SETTINGS_MODULE (see
     test_celery_app_observes_override_settings_dynamically above) — proves
     the actual recipient-resolution + dedup contract, not just that dispatch
-    args look right. Only send_notification_email.delay is mocked, so no
-    email is actually sent."""
+    args look right. Only send_notification_email.apply_async is mocked, so
+    no email is actually sent."""
 
     @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     @pytest.mark.django_db(transaction=True)
     def test_recipient_gets_exactly_one_notification_actor_gets_none_and_redelivery_dedupes(
         self, bug, admin_user, admin_membership, developer_user, developer_membership
     ):
-        with patch("apps.notifications.tasks.send_notification_email.delay"):
+        with patch("apps.notifications.tasks.send_notification_email.apply_async"):
             assign_bug(
                 bug=bug,
                 actor=admin_user,
@@ -228,14 +238,16 @@ class TestEagerTaskIntegration:
 
         # Simulate a retried/redelivered Celery execution of the exact same
         # task message (identical stable source identifiers) — calling the
-        # task function directly (not .delay) runs it synchronously in this
+        # task function directly (not .apply_async) runs it synchronously in this
         # process, independent of eager mode, exactly like a broker
         # redelivering the same message a second time. The
         # (organization, recipient, dedup_key) unique constraint + the task's
         # get_or_create is what must make this a no-op — nothing added for
         # this test.
         activity_id = notification.dedup_key.split(":", 1)[1]
-        with patch("apps.notifications.tasks.send_notification_email.delay") as email_delay_mock:
+        with patch(
+            "apps.notifications.tasks.send_notification_email.apply_async"
+        ) as email_delay_mock:
             create_notifications_for_event(
                 event_type=NotificationEventType.BUG_ASSIGNED,
                 organization_id=str(bug.organization_id),

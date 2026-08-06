@@ -1,3 +1,6 @@
+from apps.core.env import get_choice, get_log_level
+from apps.core.log_context import build_logging_config
+
 from .base import *  # noqa: F403
 
 ENVIRONMENT = "development"
@@ -6,6 +9,13 @@ DEBUG = True
 ALLOWED_HOSTS = ALLOWED_HOSTS or ["localhost", "127.0.0.1", "backend"]  # noqa: F405
 CORS_ALLOWED_ORIGINS = CORS_ALLOWED_ORIGINS or ["http://localhost:3000"]  # noqa: F405
 CSRF_TRUSTED_ORIGINS = CSRF_TRUSTED_ORIGINS or ["http://localhost:3000"]  # noqa: F405
+
+# Human-readable by default (base.py's default is "json", meant for
+# production) — DEBUG-level so the existing development convention of seeing
+# everything locally is unchanged by adding this logging config.
+LOG_FORMAT = get_choice("LOG_FORMAT", "plain", ("json", "text", "plain"))
+LOG_LEVEL = get_log_level("LOG_LEVEL", "DEBUG")
+LOGGING = build_logging_config(log_format=LOG_FORMAT, log_level=LOG_LEVEL)
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 

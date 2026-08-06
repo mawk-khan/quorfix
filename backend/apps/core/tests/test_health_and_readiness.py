@@ -2,6 +2,7 @@
 endpoints, and the shared apps.core.storage_readiness check they (and the
 check_attachment_storage management command) rely on."""
 
+import logging
 import os
 from unittest.mock import patch
 
@@ -180,6 +181,31 @@ class TestCheckAttachmentStorageWritable:
         with override_settings(ATTACHMENTS_LOCAL_ROOT=str(tmp_path)):
             check_attachment_storage_writable()
         assert list(tmp_path.iterdir()) == []
+
+
+class TestSuccessfulProbesDoNotFloodLogs:
+    """Chunk J §9/§16: an orchestrator may call these endpoints every few
+    seconds — a successful probe must never itself become a source of log
+    volume at INFO level or above."""
+
+    def test_successful_liveness_probe_logs_nothing_at_info_or_above(self, api_client, db, caplog):
+        with caplog.at_level(logging.INFO):
+            response = api_client.get("/api/health/")
+        assert response.status_code == 200
+        assert [r for r in caplog.records if r.levelno >= logging.INFO] == []
+
+    @pytest.mark.django_db
+    def test_successful_readiness_probe_logs_nothing_at_info_or_above(
+        self, api_client, tmp_path, caplog
+    ):
+        with override_settings(ATTACHMENTS_LOCAL_ROOT=str(tmp_path)):
+            with caplog.at_level(logging.INFO):
+                response = api_client.get("/api/health/ready/")
+        assert response.status_code == 200
+        # The optional request-completion log (apps.core.request) logs
+        # health/readiness paths at DEBUG specifically so this holds; see
+        # apps.core.middleware.request_logging.
+        assert [r for r in caplog.records if r.levelno >= logging.INFO] == []
 
 
 class TestCheckAttachmentStorageCommand:

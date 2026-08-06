@@ -13,7 +13,7 @@ will plug into.
 
 from __future__ import annotations
 
-import logging
+import hashlib
 import os
 from collections.abc import Iterable
 from pathlib import Path
@@ -21,7 +21,16 @@ from typing import Protocol
 
 from django.conf import settings
 
-logger = logging.getLogger(__name__)
+
+def hash_storage_key(storage_key: str) -> str:
+    """A short, stable, non-reversible reference to a storage key for use in
+    logs — the raw key embeds organization/bug/attachment UUIDs in a
+    predictable path-like shape (see apps.attachments.services.
+    _build_storage_key); this lets separate log lines about the same object
+    be correlated without printing that structure. Not a filesystem path
+    either way — LocalStorageProvider is the only thing that ever resolves a
+    key to one, and never logs it."""
+    return "sha256:" + hashlib.sha256(storage_key.encode()).hexdigest()[:16]
 
 
 class StorageProvider(Protocol):

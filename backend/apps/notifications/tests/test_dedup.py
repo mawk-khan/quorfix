@@ -14,7 +14,7 @@ def _run(**kwargs):
     apps.attachments.tests.test_removal's task.apply(...) pattern) without
     actually dispatching any email — email dispatch is asserted separately
     in test_email_tasks.py."""
-    with patch("apps.notifications.tasks.send_notification_email.delay"):
+    with patch("apps.notifications.tasks.send_notification_email.apply_async"):
         create_notifications_for_event.apply(kwargs=kwargs)
 
 

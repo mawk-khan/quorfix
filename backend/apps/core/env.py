@@ -57,3 +57,25 @@ def get_int(name: str, default: int) -> int:
         return int(raw.strip())
     except ValueError:
         raise ImproperlyConfigured(f"{name} must be an integer, got {raw!r}.") from None
+
+
+def get_choice(name: str, default: str, choices: tuple[str, ...]) -> str:
+    """Validates the raw string against a fixed, hardcoded set of choices —
+    never used to build an import path or class name from the environment.
+    Case-insensitive; the returned value is always one of `choices` exactly
+    as spelled there, never the caller's raw casing."""
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return default
+    normalized = raw.strip().lower()
+    for choice in choices:
+        if choice.lower() == normalized:
+            return choice
+    raise ImproperlyConfigured(f"{name} must be one of {choices}, got {raw!r}.")
+
+
+_VALID_LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+
+def get_log_level(name: str, default: str) -> str:
+    return get_choice(name, default, _VALID_LOG_LEVELS)

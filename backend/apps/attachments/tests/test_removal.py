@@ -4,6 +4,7 @@ import pytest
 
 from apps.activities.models import ActivityVerb, BugActivity
 from apps.attachments.models import Attachment, AttachmentStatus
+from apps.core.task_correlation import _CORRELATION_HEADER_KEY
 
 
 @pytest.mark.django_db
@@ -147,10 +148,15 @@ class TestCleanupDispatch:
         attachment = make_uploaded_attachment(bug, admin_user, membership=admin_membership)
         storage_key = attachment.storage_key
 
-        with patch("apps.attachments.tasks.delete_attachment_object.delay") as mock_delay:
+        with patch("apps.attachments.tasks.delete_attachment_object.apply_async") as mock_delay:
             response = admin_client.delete(f"/api/bugs/{bug.pk}/attachments/{attachment.pk}/")
         assert response.status_code == 200
-        mock_delay.assert_called_once_with(storage_key)
+        mock_delay.assert_called_once()
+        assert mock_delay.call_args.kwargs["args"] == [storage_key]
+        # A real HTTP request always has a request ID (see
+        # apps.core.middleware.request_id) — the dispatch propagates it as a
+        # task header rather than a fixed/empty value.
+        assert mock_delay.call_args.kwargs["headers"][_CORRELATION_HEADER_KEY]
 
     @pytest.mark.django_db
     def test_cleanup_task_deletes_the_object_and_is_idempotent(
@@ -176,7 +182,7 @@ class TestCleanupDispatch:
         attachment = make_uploaded_attachment(bug, admin_user, membership=admin_membership)
 
         with patch(
-            "apps.attachments.tasks.delete_attachment_object.delay",
+            "apps.attachments.tasks.delete_attachment_object.apply_async",
             side_effect=ConnectionError("broker unreachable"),
         ):
             response = admin_client.delete(f"/api/bugs/{bug.pk}/attachments/{attachment.pk}/")

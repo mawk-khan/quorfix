@@ -1,7 +1,8 @@
 import os
 from pathlib import Path
 
-from apps.core.env import get_bool, get_int, get_list
+from apps.core.env import get_bool, get_choice, get_int, get_list, get_log_level
+from apps.core.log_context import build_logging_config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -43,6 +44,15 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Immediately after SecurityMiddleware and before everything else, so a
+    # request ID is established before any other middleware runs and stays
+    # available for the exception-logging that happens inside get_response()
+    # further down the chain — see apps.core.middleware.request_id.
+    "apps.core.middleware.request_id.RequestIdMiddleware",
+    # Optional (Chunk J §12) request-completion timing log — placed
+    # immediately after RequestIdMiddleware so its log line already carries
+    # the request_id that middleware establishes.
+    "apps.core.middleware.request_logging.RequestLoggingMiddleware",
     # Serves STATIC_ROOT directly from the WSGI process — there is no
     # separate reverse proxy or CDN in front of gunicorn in this cloud-
     # neutral setup. Harmless in development/test too: it only serves files
@@ -134,6 +144,24 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+# Without this, celery's own worker bootstep reconfigures (hijacks) the root
+# logger with its own formatting after Django's LOGGING (below) has already
+# configured it — silently discarding request_id/environment/service
+# correlation for every task log line. See docs/OBSERVABILITY.md.
+CELERY_WORKER_HIJACK_ROOT_LOGGER = False
+
+# -- Observability (Phase 6 Chunk J) -----------------------------------------
+#
+# SERVICE_NAME/REQUEST_ID_HEADER have safe, always-valid defaults — no
+# environment can leave these unset. LOG_FORMAT/LOG_LEVEL are validated
+# against a fixed, hardcoded set of choices (get_choice/get_log_level raise
+# ImproperlyConfigured on anything else) — never used to import or construct
+# a class from an arbitrary environment string. See docs/OBSERVABILITY.md.
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "bugfixer-backend")
+REQUEST_ID_HEADER = os.environ.get("REQUEST_ID_HEADER", "X-Request-ID")
+LOG_FORMAT = get_choice("LOG_FORMAT", "json", ("json", "text", "plain"))
+LOG_LEVEL = get_log_level("LOG_LEVEL", "INFO")
+LOGGING = build_logging_config(log_format=LOG_FORMAT, log_level=LOG_LEVEL)
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

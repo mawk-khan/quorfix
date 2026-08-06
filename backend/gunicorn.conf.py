@@ -39,3 +39,21 @@ timeout = _int_env("GUNICORN_TIMEOUT", 30)
 # Docker-friendly: both go to the container's own stdout/stderr, not files.
 accesslog = "-"
 errorlog = "-"
+
+# Appends the request ID onto gunicorn's own default access-log line by
+# reading it straight off the *response* header apps.core.middleware.
+# RequestIdMiddleware always sets (%({header}o)s reads a response header;
+# the header name matches REQUEST_ID_HEADER's own default — this file is
+# loaded outside Django's settings, so it can't read that setting and
+# instead hardcodes the same literal default value it documents).
+#
+# This is deliberately NOT routed through Django's LOGGING config (see
+# apps.core.log_context.build_logging_config's docstring and
+# docs/OBSERVABILITY.md "Known limitations"): gunicorn's access-log call
+# happens after RequestIdMiddleware's own request-scoped context has
+# already been cleared, so the request_id field a shared filter would add
+# is unavailable there — the header atom below is the only place this
+# access line can genuinely carry it.
+access_log_format = (
+    '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" rid=%({X-Request-ID}o)s'
+)
