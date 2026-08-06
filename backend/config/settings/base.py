@@ -1,11 +1,20 @@
 import os
 from pathlib import Path
 
+from apps.core.env import get_bool, get_int, get_list
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+# Safe fallback only — every concrete settings module (development/test/
+# production) sets this explicitly to its own literal value below, so this
+# is only ever consulted if a future settings module forgets to. It must
+# never resolve to "production" by accident (e.g. via a stray ENVIRONMENT
+# env var), so it deliberately does NOT read from the environment.
+ENVIRONMENT = "development"
+
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "")
-DEBUG = os.environ.get("DJANGO_DEBUG", "false").lower() == "true"
-ALLOWED_HOSTS = [h for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if h]
+DEBUG = get_bool("DJANGO_DEBUG", False)
+ALLOWED_HOSTS = get_list("DJANGO_ALLOWED_HOSTS")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -170,7 +179,7 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 # Analytics dashboard. Short-TTL only (see apps.analytics.caching) — no
 # event-driven invalidation. A Redis outage falls back to direct queries
 # rather than failing the dashboard.
-ANALYTICS_CACHE_TTL_SECONDS = int(os.environ.get("ANALYTICS_CACHE_TTL_SECONDS", "60"))
+ANALYTICS_CACHE_TTL_SECONDS = get_int("ANALYTICS_CACHE_TTL_SECONDS", 60)
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Bug Fixer API",
@@ -179,10 +188,10 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
 }
 
-CORS_ALLOWED_ORIGINS = [o for o in os.environ.get("CORS_ALLOWED_ORIGINS", "").split(",") if o]
+CORS_ALLOWED_ORIGINS = get_list("CORS_ALLOWED_ORIGINS")
 CORS_ALLOW_CREDENTIALS = True
 
-CSRF_TRUSTED_ORIGINS = [o for o in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if o]
+CSRF_TRUSTED_ORIGINS = get_list("CSRF_TRUSTED_ORIGINS")
 
 SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
