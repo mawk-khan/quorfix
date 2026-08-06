@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 from django.apps import apps
 from django.conf import settings
+from django.test import override_settings
 
 from apps.core.registries import (
     analytics_registry,
@@ -39,6 +40,7 @@ def test_registries_may_be_empty():
         assert registry.get("anything") is None
 
 
+@override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
 @pytest.mark.django_db(transaction=True)
 def test_full_notification_lifecycle_works_with_professional_absent(
     admin_client,
@@ -52,7 +54,19 @@ def test_full_notification_lifecycle_works_with_professional_absent(
     """Assign, comment (with a mention), read, and mark-all-read — the full
     Chunk 3 surface — end to end, exactly as a Community-only installation
     would run it, with no Professional module present anywhere in
-    INSTALLED_APPS."""
+    INSTALLED_APPS.
+
+    Forces Celery eager mode explicitly rather than relying on the ambient
+    DJANGO_SETTINGS_MODULE: create_notifications_for_event.delay is real
+    (unmocked) here, and config.celery.app reads CELERY_TASK_ALWAYS_EAGER
+    from Django settings at call time (see
+    test_transaction_dispatch.test_celery_app_observes_override_settings_dynamically
+    for the proof), so under config.settings.development (where eager mode
+    is off) this task would otherwise be sent to a real Redis broker with no
+    in-process worker to consume it before the assertions below run — the
+    original failure this test was written to fix, and the reason
+    transaction.on_commit itself was never the problem (it already fires
+    correctly under django_db(transaction=True))."""
     with patch("apps.notifications.tasks.send_notification_email.delay"):
         assign_response = admin_client.post(
             f"/api/bugs/{bug.pk}/assign/",

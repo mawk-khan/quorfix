@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import pytest
+from django.test import override_settings
 
 from apps.bugs.models import BugStatus
 from apps.bugs.services import assign_bug, transition_bug
@@ -216,9 +217,19 @@ class TestEndToEndAssignmentNotification:
     asserting dispatch args, so a regression here would fail on a missing
     Notification row, not just a missing kwarg."""
 
+    @override_settings(CELERY_TASK_ALWAYS_EAGER=True, CELERY_TASK_EAGER_PROPAGATES=True)
     def test_assignee_actually_receives_a_notification(
         self, bug, admin_user, admin_membership, developer_user, developer_membership
     ):
+        """Forces Celery eager mode explicitly rather than relying on the
+        ambient DJANGO_SETTINGS_MODULE — create_notifications_for_event.delay
+        is real (unmocked) here, and under config.settings.development
+        (eager mode off) it would be sent to a real Redis broker with no
+        in-process worker to consume it before the assertions below run.
+        transaction.on_commit itself already fires correctly under this
+        class's django_db(transaction=True) marker; that was never the
+        problem. See test_transaction_dispatch.py for the mechanism proof and
+        for broader transaction-boundary/broker-failure coverage."""
         with patch("apps.notifications.tasks.send_notification_email.delay"):
             assign_bug(
                 bug=bug,
@@ -234,3 +245,6 @@ class TestEndToEndAssignmentNotification:
         )
         assert notification.bug_id == bug.pk
         assert notification.actor_id == admin_user.pk
+        assert not Notification.objects.filter(
+            organization=bug.organization, recipient=admin_user
+        ).exists()
