@@ -9,6 +9,10 @@ on:
     paths:
       - "backend/**"
       - ".github/workflows/backend.yml"
+  # Lets release.yml call this workflow as a release-readiness gate (full
+  # suite regardless of which paths changed since the last tag) — path
+  # filters above only apply to push/pull_request, never to workflow_call.
+  workflow_call:
 
 # Cancel a superseded run on the same branch/PR rather than letting both
 # finish — the older run's result is moot the instant a newer push exists.
@@ -33,13 +37,13 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_DB: bugfixer
-          POSTGRES_USER: bugfixer
-          POSTGRES_PASSWORD: bugfixer
+          POSTGRES_DB: quorfix
+          POSTGRES_USER: quorfix
+          POSTGRES_PASSWORD: quorfix
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U bugfixer"
+          --health-cmd "pg_isready -U quorfix"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 5
@@ -58,9 +62,9 @@ jobs:
       # never accidentally run against config.settings.development.
       DJANGO_SETTINGS_MODULE: config.settings.test
       DJANGO_SECRET_KEY: ci-secret-key
-      POSTGRES_DB: bugfixer
-      POSTGRES_USER: bugfixer
-      POSTGRES_PASSWORD: bugfixer
+      POSTGRES_DB: quorfix
+      POSTGRES_USER: quorfix
+      POSTGRES_PASSWORD: quorfix
       POSTGRES_HOST: localhost
       POSTGRES_PORT: 5432
       # config.settings.test sets CELERY_TASK_ALWAYS_EAGER=True (see
@@ -70,7 +74,7 @@ jobs:
       REDIS_URL: redis://localhost:6379/0
       # A disposable, job-local directory — never the repo checkout itself
       # and never a path any other job/step shares.
-      ATTACHMENTS_LOCAL_ROOT: /tmp/bugfixer-ci-attachments
+      ATTACHMENTS_LOCAL_ROOT: /tmp/quorfix-ci-attachments
 
     steps:
       - uses: actions/checkout@v4
@@ -175,4 +179,28 @@ jobs:
             echo '```'
           } >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
           pip-audit -r requirements.txt | tee -a "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
+          echo '```' >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
+
+      # Blocking as of Phase 6 Chunk K: previously non-blocking (or simply
+      # unscanned in CI) because of a single outstanding advisory,
+      # PYSEC-2026-1845 against pytest 8.3.4 — resolved by upgrading to
+      # pytest 9.1.1 (see docs/ACCESS_AND_TESTING.md Phase 6 Chunk K).
+      # pytest-django stays pinned at 4.9.0: 4.13.0 (the latest at the time)
+      # has a reproducible incompatibility with pytest 9 against this
+      # project's own suite (AttributeError:
+      # 'PytestDjangoTestCase' has no attribute '_pre_setup_ran_eagerly',
+      # from pytest_django/fixtures.py) that 4.9.0 does not exhibit — not
+      # itself a security concern, just a compatibility one, so it doesn't
+      # block this scan (dev-only, never shipped).
+      - name: Development dependency audit (pip-audit, blocking)
+        run: |
+          pip install --quiet pip-audit
+          {
+            echo '### Backend development dependency audit (pip-audit)'
+            echo
+            echo '`backend/requirements-dev.txt`, including transitive dependencies.'
+            echo
+            echo '```'
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
+          pip-audit -r requirements-dev.txt | tee -a "${GITHUB_STEP_SUMMARY:-/dev/stdout}"
           echo '```' >> "${GITHUB_STEP_SUMMARY:-/dev/stdout}"

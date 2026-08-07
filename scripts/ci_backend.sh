@@ -41,4 +41,8 @@ run python manage.py spectacular --file /tmp/schema.yml --validate
 # requirements-dev.txt.
 run sh -c 'pip install --quiet pip-audit && pip-audit -r requirements.txt'
 
+# Blocking as of Phase 6 Chunk K — see requirements-dev.txt's own pytest
+# pin comment and docs/ACCESS_AND_TESTING.md Phase 6 Chunk K.
+run sh -c 'pip install --quiet pip-audit && pip-audit -r requirements-dev.txt'
+
 log "Backend CI sequence passed."

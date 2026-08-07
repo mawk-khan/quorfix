@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/restore_attachments.sh — destructive local-attachments restore
-# for Bug Fixer's production Compose stack (docker-compose.prod.yml's
+# for Quorfix's production Compose stack (docker-compose.prod.yml's
 # `attachments_data` named volume).
 #
 # Usage:

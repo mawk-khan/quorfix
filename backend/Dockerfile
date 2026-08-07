@@ -54,7 +54,9 @@ FROM deps AS production
 # through ARG).
 ARG VERSION=dev
 ARG VCS_REF=unknown
-LABEL org.opencontainers.image.source="git@bitbucket-claude:aivah/bug-fixer.git" \
+LABEL org.opencontainers.image.title="Quorfix backend" \
+      org.opencontainers.image.description="Quorfix Community backend (Django/DRF API + Celery worker image)" \
+      org.opencontainers.image.source="https://github.com/mawk-khan/quorfix" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.version="${VERSION}"
 

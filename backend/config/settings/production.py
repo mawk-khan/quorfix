@@ -8,7 +8,7 @@ ENVIRONMENT = "production"
 
 # Hardcoded, not environment-derived — DEBUG must never be a value an
 # operator can accidentally leave enabled via a stray DJANGO_DEBUG=true in a
-# production .env. apps.core.checks.check_debug (bugfixer.E002) is a
+# production .env. apps.core.checks.check_debug (quorfix.E002) is a
 # structural safety net for this, not the primary control.
 DEBUG = False
 
@@ -41,7 +41,7 @@ SECURE_HSTS_PRELOAD = True
 # load balancers all do this by default). Without this, SECURE_SSL_REDIRECT
 # above cannot tell an already-HTTPS request forwarded as plain HTTP from a
 # genuinely insecure one, and redirect-loops behind the proxy. See
-# apps.core.checks.check_https_proxy_header (bugfixer.E008).
+# apps.core.checks.check_https_proxy_header (quorfix.E008).
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"

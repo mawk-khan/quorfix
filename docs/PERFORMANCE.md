@@ -40,10 +40,12 @@ Read this before running anything in this document against a real database.
   point it at the same disposable database you generated data into.
 
 Every number in this document was produced against a disposable PostgreSQL
-container created solely for this exercise (`bugfixer_perf_test`, a
+container created solely for this exercise (`quorfix_perf_test`, a
 throwaway `postgres:16-alpine` container on a separate Docker volume, joined
-to the project's own `bug-fixer_default` network) — never against the
-project's own development database, and never against production.
+to the project's own `bug-fixer_default` network — docker-compose.yml's own
+Compose project name is deliberately unrenamed, see that file's own comment)
+— never against the project's own development database, and never against
+production.
 
 ## 3. Dataset profiles
 

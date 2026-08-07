@@ -1,4 +1,4 @@
-name: bugfixer-e2e
+name: quorfix-e2e
 type: generic
 docroot: frontend
 php_version: "8.4"

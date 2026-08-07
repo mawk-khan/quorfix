@@ -9,6 +9,10 @@ on:
     paths:
       - "frontend/**"
       - ".github/workflows/frontend.yml"
+  # Lets release.yml call this workflow as a release-readiness gate (full
+  # suite regardless of which paths changed since the last tag) — path
+  # filters above only apply to push/pull_request, never to workflow_call.
+  workflow_call:
 
 concurrency:
   group: frontend-${{ github.workflow }}-${{ github.ref }}

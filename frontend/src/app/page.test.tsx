@@ -121,7 +121,7 @@ const workloadFixture: Workload = {
 };
 
 const activeProjectsFixture: ActiveProject[] = [
-  { id: "p1", key: "BFW", name: "Bug Fixer Web", status: "active", total_bugs: 5, open_bugs: 3 },
+  { id: "p1", key: "BFW", name: "Quorfix Web", status: "active", total_bugs: 5, open_bugs: 3 },
 ];
 
 function recentActivityPage(): PaginatedResponse<DashboardActivity> {
@@ -160,7 +160,7 @@ describe("Dashboard (HomePage)", () => {
     });
     renderWithProviders(<HomePage />);
 
-    expect(await screen.findByRole("heading", { name: "Bug Fixer" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Quorfix" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sign in" })).toBeInTheDocument();
     expect(screen.queryByText("Dashboard")).not.toBeInTheDocument();
   });

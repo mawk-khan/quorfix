@@ -8,6 +8,7 @@ import { ApiError } from "@/lib/api/client";
 import { listNotificationPreferences, notificationKeys, updateNotificationPreference } from "@/lib/api/notifications";
 import type { NotificationEventType } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session-provider";
+import { usePageTitle } from "@/lib/use-page-title";
 
 const EVENT_TYPE_LABELS: Record<NotificationEventType, string> = {
   bug_assigned: "A bug is assigned to you",
@@ -30,6 +31,7 @@ function describeError(error: unknown): string {
 }
 
 export default function NotificationPreferencesPage() {
+  usePageTitle("Notification preferences");
   const { session, isLoading: sessionLoading } = useSession();
   const queryClient = useQueryClient();
 

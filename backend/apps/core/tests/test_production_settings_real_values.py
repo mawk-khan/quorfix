@@ -34,8 +34,8 @@ _VALID_PRODUCTION_ENV = {
     "CSRF_TRUSTED_ORIGINS": "https://app.example.test",
     "EMAIL_HOST": "smtp.example.test",
     "ATTACHMENTS_LOCAL_ROOT": "/data/attachments",
-    "POSTGRES_DB": "bugfixer",
-    "POSTGRES_USER": "bugfixer",
+    "POSTGRES_DB": "quorfix",
+    "POSTGRES_USER": "quorfix",
     "POSTGRES_HOST": "db",
     "REDIS_URL": "redis://redis:6379/0",
 }
@@ -60,7 +60,7 @@ def _run_manage(args: list[str], env_overrides: dict | None = None) -> subproces
 
 def test_real_production_settings_pass_manage_py_check_with_valid_env():
     """The actual, committed config.settings.production module — not a
-    synthetic stand-in — must pass every bugfixer.E0xx check when given a
+    synthetic stand-in — must pass every quorfix.E0xx check when given a
     valid production-shaped environment."""
     result = _run_manage(["check"])
     assert result.returncode == 0, (
@@ -77,7 +77,7 @@ def test_real_production_settings_reject_an_invalid_env():
         ["check"], env_overrides={"DJANGO_SECRET_KEY": "change-me-to-a-random-secret"}
     )
     assert result.returncode != 0
-    assert "bugfixer.E001" in result.stdout + result.stderr
+    assert "quorfix.E001" in result.stdout + result.stderr
 
 
 def _print_real_settings_script() -> str:

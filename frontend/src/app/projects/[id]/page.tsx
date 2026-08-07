@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api/client";
 import { listMembers } from "@/lib/api/members";
 import { archiveProject, getProject, restoreProject, updateProject } from "@/lib/api/projects";
 import { useSession } from "@/lib/auth/session-provider";
+import { usePageTitle } from "@/lib/use-page-title";
 import { updateProjectSchema, type UpdateProjectFormValues } from "@/lib/validation/projects";
 
 import { ProjectForm } from "../project-form";
@@ -46,6 +47,7 @@ export default function ProjectDetailPage() {
     queryFn: () => getProject(id),
     enabled: !!session?.authenticated,
   });
+  usePageTitle(projectQuery.data ? `${projectQuery.data.name} · Projects` : "Projects");
 
   const membersQuery = useQuery({
     queryKey: ["members"],

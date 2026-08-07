@@ -16,14 +16,17 @@
 # selective port publishing alone already achieves the requirement without
 # that risk).
 
-name: bug-fixer-prod
+# Not yet deployed anywhere (no tagged release has ever been cut — see
+# docs/SECURITY.md), so unlike docker-compose.yml's project name this one
+# carries no existing-deployment compatibility constraint.
+name: quorfix-prod
 
 services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-bugfixer}
-      POSTGRES_USER: ${POSTGRES_USER:-bugfixer}
+      POSTGRES_DB: ${POSTGRES_DB:-quorfix}
+      POSTGRES_USER: ${POSTGRES_USER:-quorfix}
       # No insecure default — docker compose itself refuses to start if this
       # is unset or empty, rather than silently booting Postgres with a
       # blank/well-known password.
@@ -31,7 +34,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bugfixer}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-quorfix}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -65,7 +68,12 @@ services:
     # outside the Docker host.
 
   backend:
-    image: bugfixer-backend:${VERSION:-local}
+    # Local tag by default — this Compose file builds it itself (below),
+    # never pulls from a registry. Point VERSION at a published
+    # ghcr.io/<owner>/quorfix-backend tag's version instead of building
+    # locally by overriding `image:` directly (Compose lets any service
+    # field be overridden via an additional -f file); see docs/RELEASING.md.
+    image: quorfix-backend:${VERSION:-local}
     build:
       context: ./backend
       # No `target:` — builds the Dockerfile's default (final) stage, the
@@ -137,7 +145,7 @@ services:
     # BACKEND_INTERNAL_URL, never through a published port.
 
   celery_worker:
-    image: bugfixer-backend:${VERSION:-local}
+    image: quorfix-backend:${VERSION:-local}
     build:
       context: ./backend
       args:
@@ -156,6 +164,10 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.production
       POSTGRES_HOST: db
       REDIS_URL: redis://redis:6379/0
+      # Distinct from `backend`'s (code-default) SERVICE_NAME so worker log
+      # lines are distinguishable — overridable like any other setting via
+      # an operator's own SERVICE_NAME in .env. See docs/OBSERVABILITY.md.
+      SERVICE_NAME: ${SERVICE_NAME:-quorfix-worker}
       # Same path as `backend`, mounting the same named volume below — a
       # hard requirement, not a convenience: the worker and the web process
       # must agree on where an uploaded file actually lives.
@@ -185,7 +197,7 @@ services:
     stop_grace_period: 60s
 
   frontend:
-    image: bugfixer-frontend:${VERSION:-local}
+    image: quorfix-frontend:${VERSION:-local}
     build:
       context: ./frontend
       # No `target:` — builds the Dockerfile's default (final) `runner`

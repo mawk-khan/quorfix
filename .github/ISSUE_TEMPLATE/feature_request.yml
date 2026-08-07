@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest an idea for Quorfix
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before requesting a feature, check
+        [CLAUDE.md](https://github.com/mawk-khan/quorfix/blob/master/CLAUDE.md) — it defines
+        what belongs in Community vs. Professional. A request for something explicitly scoped
+        to Professional (custom workflows, SSO/SAML, advanced analytics, automation rules, etc.)
+        is still welcome, but expect it to be tracked differently than a Community request.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What are you trying to do that Quorfix doesn't currently support?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: edition
+    attributes:
+      label: Which edition does this belong to?
+      description: See CLAUDE.md "Edition boundaries" if you're unsure.
+      options:
+        - Community
+        - Professional
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context

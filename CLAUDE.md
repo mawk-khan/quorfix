@@ -1,12 +1,12 @@
-# Bug Fixer — Claude Code Instructions
+# Quorfix — Claude Code Instructions
 
 ## Product
 
-Bug Fixer is an open-core bug-tracking platform.
+Quorfix is an open-core bug-tracking platform.
 
-Bug Fixer Community is free and open to small teams.
+Quorfix Community is free and open to small teams.
 
-Bug Fixer Professional extends Community with advanced workflows, analytics, integrations, automation, licensing, and commercial support.
+Quorfix Professional extends Community with advanced workflows, analytics, integrations, automation, licensing, and commercial support.
 
 ## Primary rule
 

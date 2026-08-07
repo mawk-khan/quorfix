@@ -16,6 +16,8 @@ import {
 } from "@/lib/api/analytics";
 import { useDashboardFilters } from "@/lib/dashboard/use-dashboard-filters";
 import { useSession } from "@/lib/auth/session-provider";
+import { PRODUCT_NAME } from "@/lib/branding";
+import { usePageTitle } from "@/lib/use-page-title";
 
 import { ActiveProjectsPanel } from "./active-projects-panel";
 import { BugTrendsChart } from "./bug-trends-chart";
@@ -48,6 +50,7 @@ function DashboardPageContent() {
   const { ready, filters, updateFilters } = useDashboardFilters();
 
   const authenticated = !!session?.authenticated;
+  usePageTitle(authenticated ? "Dashboard" : undefined);
   const projectParam = filters.project || undefined;
   const rangeParams = { date_from: filters.date_from, date_to: filters.date_to, project: projectParam };
   const projectOnlyParams = { project: projectParam };
@@ -112,7 +115,7 @@ function DashboardPageContent() {
   if (!session?.authenticated) {
     return (
       <main id="main-content" tabIndex={-1} className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-        <h1 className="text-2xl font-semibold">Bug Fixer</h1>
+        <h1 className="text-2xl font-semibold">{PRODUCT_NAME}</h1>
         <Link href="/sign-in" className="underline">
           Sign in
         </Link>

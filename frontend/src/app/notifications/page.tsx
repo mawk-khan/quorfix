@@ -15,6 +15,7 @@ import {
 } from "@/lib/api/notifications";
 import { useSession } from "@/lib/auth/session-provider";
 import { NOTIFICATION_EVENT_LABELS, notificationActorLabel } from "@/lib/notifications/format";
+import { usePageTitle } from "@/lib/use-page-title";
 
 import { NotificationFilters, type NotificationFiltersValue } from "./notification-filters";
 import { PaginationControls } from "./pagination-controls";
@@ -32,6 +33,7 @@ function describeError(error: unknown): string {
 }
 
 export default function NotificationsPage() {
+  usePageTitle("Notifications");
   return (
     // useSearchParams() opts this page out of static prerendering unless
     // wrapped in Suspense — matches app/bugs/page.tsx and app/projects/page.tsx.

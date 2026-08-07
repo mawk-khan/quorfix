@@ -1,4 +1,4 @@
-"""Production-only fail-fast system checks for Bug Fixer.
+"""Production-only fail-fast system checks for Quorfix.
 
 Registered from apps.core.apps.CoreConfig.ready() via django.core.checks.register
 (with deploy=False, the default, so they run on every plain `manage.py check` —
@@ -9,18 +9,18 @@ and test keep working without ever supplying a production-shaped value, while
 production fails loudly and immediately when misconfigured.
 
 Stable check-ID registry (never renumber an existing ID — only append):
-    bugfixer.E001  DJANGO_SECRET_KEY missing, placeholder, or too short
-    bugfixer.E002  DEBUG must be False
-    bugfixer.E003  ALLOWED_HOSTS empty, wildcard, or contains a blank entry
-    bugfixer.E004  CSRF_TRUSTED_ORIGINS empty, missing scheme, or bare wildcard
-    bugfixer.E005  CORS misconfiguration (wildcard + credentials, stray "*")
-    bugfixer.E006  Email backend is console/locmem, or SMTP host is missing
-    bugfixer.E007  Cookie security flags (Secure/HttpOnly/SameSite) unsafe
-    bugfixer.E008  SECURE_SSL_REDIRECT enabled without SECURE_PROXY_SSL_HEADER
-    bugfixer.E009  Database is not PostgreSQL, or name/host is missing
-    bugfixer.E010  Redis cache/broker URL missing or not a redis(s):// URL
-    bugfixer.E011  ATTACHMENTS_LOCAL_ROOT missing, relative, or a temp path
-    bugfixer.E012  ANALYTICS_CACHE_TTL_SECONDS out of the production-sane range
+    quorfix.E001  DJANGO_SECRET_KEY missing, placeholder, or too short
+    quorfix.E002  DEBUG must be False
+    quorfix.E003  ALLOWED_HOSTS empty, wildcard, or contains a blank entry
+    quorfix.E004  CSRF_TRUSTED_ORIGINS empty, missing scheme, or bare wildcard
+    quorfix.E005  CORS misconfiguration (wildcard + credentials, stray "*")
+    quorfix.E006  Email backend is console/locmem, or SMTP host is missing
+    quorfix.E007  Cookie security flags (Secure/HttpOnly/SameSite) unsafe
+    quorfix.E008  SECURE_SSL_REDIRECT enabled without SECURE_PROXY_SSL_HEADER
+    quorfix.E009  Database is not PostgreSQL, or name/host is missing
+    quorfix.E010  Redis cache/broker URL missing or not a redis(s):// URL
+    quorfix.E011  ATTACHMENTS_LOCAL_ROOT missing, relative, or a temp path
+    quorfix.E012  ANALYTICS_CACHE_TTL_SECONDS out of the production-sane range
 
 No check here ever includes a secret value (SECRET_KEY, database/SMTP/Redis
 passwords) in its message — only the name of the environment variable to set.
@@ -82,7 +82,7 @@ def check_secret_key(app_configs, **kwargs):
                 "DJANGO_SECRET_KEY is not set. Production requires a unique, "
                 "unpredictable secret key — set the DJANGO_SECRET_KEY environment "
                 "variable (see .env.example). This message never includes the value.",
-                id="bugfixer.E001",
+                id="quorfix.E001",
             )
         ]
     if value in _PLACEHOLDER_SECRET_KEYS:
@@ -90,7 +90,7 @@ def check_secret_key(app_configs, **kwargs):
             Error(
                 "DJANGO_SECRET_KEY is set to a known development/test placeholder "
                 "value. Set DJANGO_SECRET_KEY to a unique, unpredictable value.",
-                id="bugfixer.E001",
+                id="quorfix.E001",
             )
         ]
     if len(value.strip()) < MIN_SECRET_KEY_LENGTH:
@@ -99,7 +99,7 @@ def check_secret_key(app_configs, **kwargs):
                 f"DJANGO_SECRET_KEY is shorter than the minimum of "
                 f"{MIN_SECRET_KEY_LENGTH} characters expected in production. Set a "
                 "longer, unpredictable value.",
-                id="bugfixer.E001",
+                id="quorfix.E001",
             )
         ]
     return []
@@ -113,7 +113,7 @@ def check_debug(app_configs, **kwargs):
             Error(
                 "DEBUG must be False in production — it exposes stack traces, "
                 "settings values, and environment details on error pages.",
-                id="bugfixer.E002",
+                id="quorfix.E002",
             )
         ]
     return []
@@ -129,7 +129,7 @@ def check_allowed_hosts(app_configs, **kwargs):
             Error(
                 "ALLOWED_HOSTS is empty. Production requires the exact hostname(s) "
                 "this instance is served from — set DJANGO_ALLOWED_HOSTS.",
-                id="bugfixer.E003",
+                id="quorfix.E003",
             )
         )
     if "*" in hosts:
@@ -138,7 +138,7 @@ def check_allowed_hosts(app_configs, **kwargs):
                 "ALLOWED_HOSTS contains a bare wildcard '*', which accepts the Host "
                 "header from any request and defeats Django's Host-header "
                 "validation. List explicit hostnames instead.",
-                id="bugfixer.E003",
+                id="quorfix.E003",
             )
         )
     if any(not host.strip() for host in hosts):
@@ -146,7 +146,7 @@ def check_allowed_hosts(app_configs, **kwargs):
             Error(
                 "ALLOWED_HOSTS contains a blank entry — check DJANGO_ALLOWED_HOSTS "
                 "for stray commas.",
-                id="bugfixer.E003",
+                id="quorfix.E003",
             )
         )
     return errors
@@ -163,7 +163,7 @@ def check_csrf_trusted_origins(app_configs, **kwargs):
                 "CSRF_TRUSTED_ORIGINS is empty. Production requires the exact "
                 "origin(s) the frontend is served from — set CSRF_TRUSTED_ORIGINS "
                 "(HTTPS is recommended).",
-                id="bugfixer.E004",
+                id="quorfix.E004",
             )
         )
     for origin in origins:
@@ -174,7 +174,7 @@ def check_csrf_trusted_origins(app_configs, **kwargs):
                     "Django requires an explicit scheme and host, e.g. "
                     "https://app.example.com or a scoped subdomain wildcard like "
                     "https://*.example.com.",
-                    id="bugfixer.E004",
+                    id="quorfix.E004",
                 )
             )
             continue
@@ -185,7 +185,7 @@ def check_csrf_trusted_origins(app_configs, **kwargs):
                     f"CSRF_TRUSTED_ORIGINS entry {origin!r} must include an explicit "
                     "http:// or https:// scheme and host, e.g. "
                     "https://app.example.com.",
-                    id="bugfixer.E004",
+                    id="quorfix.E004",
                 )
             )
     return errors
@@ -207,7 +207,7 @@ def check_cors(app_configs, **kwargs):
                 "credentials lets any website read cookie-authenticated responses "
                 "— disable CORS_ALLOW_ALL_ORIGINS or list explicit "
                 "CORS_ALLOWED_ORIGINS instead.",
-                id="bugfixer.E005",
+                id="quorfix.E005",
             )
         )
     elif allow_all:
@@ -218,7 +218,7 @@ def check_cors(app_configs, **kwargs):
                 "architecture), leave CORS_ALLOWED_ORIGINS empty instead of "
                 "allowing all origins; if genuine cross-origin access is needed, "
                 "list the exact origins.",
-                id="bugfixer.E005",
+                id="quorfix.E005",
             )
         )
     if "*" in origins:
@@ -228,7 +228,7 @@ def check_cors(app_configs, **kwargs):
                 "django-cors-headers does not treat that as a wildcard in this "
                 "list. Use CORS_ALLOW_ALL_ORIGINS for that (subject to the "
                 "credentials warning above), or list explicit origins.",
-                id="bugfixer.E005",
+                id="quorfix.E005",
             )
         )
     return errors
@@ -246,7 +246,7 @@ def check_email(app_configs, **kwargs):
                 "locally instead of delivering it. Configure a real delivery "
                 "backend (e.g. django.core.mail.backends.smtp.EmailBackend) for "
                 "production.",
-                id="bugfixer.E006",
+                id="quorfix.E006",
             )
         )
     elif backend == "django.core.mail.backends.smtp.EmailBackend":
@@ -257,7 +257,7 @@ def check_email(app_configs, **kwargs):
                     "Set EMAIL_HOST to the SMTP relay's address. (EMAIL_HOST_USER/"
                     "EMAIL_HOST_PASSWORD are not required here — some relays "
                     "authenticate without them.)",
-                    id="bugfixer.E006",
+                    id="quorfix.E006",
                 )
             )
     return errors
@@ -272,7 +272,7 @@ def check_cookies(app_configs, **kwargs):
             Error(
                 "SESSION_COOKIE_SECURE must be True in production so the session "
                 "cookie is never sent over plain HTTP.",
-                id="bugfixer.E007",
+                id="quorfix.E007",
             )
         )
     if not settings.CSRF_COOKIE_SECURE:
@@ -280,7 +280,7 @@ def check_cookies(app_configs, **kwargs):
             Error(
                 "CSRF_COOKIE_SECURE must be True in production so the CSRF cookie "
                 "is never sent over plain HTTP.",
-                id="bugfixer.E007",
+                id="quorfix.E007",
             )
         )
     if not settings.SESSION_COOKIE_HTTPONLY:
@@ -288,7 +288,7 @@ def check_cookies(app_configs, **kwargs):
             Error(
                 "SESSION_COOKIE_HTTPONLY must be True — the session cookie must "
                 "never be readable from JavaScript.",
-                id="bugfixer.E007",
+                id="quorfix.E007",
             )
         )
     if settings.SESSION_COOKIE_SAMESITE not in _VALID_SAMESITE_VALUES:
@@ -302,7 +302,7 @@ def check_cookies(app_configs, **kwargs):
                 "cross-site top-level navigation) still carries their session "
                 "cookie — 'Strict' would block that, so it is deliberately not "
                 "hard-required here.",
-                id="bugfixer.E007",
+                id="quorfix.E007",
             )
         )
     if settings.CSRF_COOKIE_SAMESITE not in _VALID_SAMESITE_VALUES:
@@ -310,7 +310,7 @@ def check_cookies(app_configs, **kwargs):
             Error(
                 f"CSRF_COOKIE_SAMESITE is {settings.CSRF_COOKIE_SAMESITE!r}; must be "
                 f"one of {_VALID_SAMESITE_VALUES}.",
-                id="bugfixer.E007",
+                id="quorfix.E007",
             )
         )
     return errors
@@ -330,7 +330,7 @@ def check_https_proxy_header(app_configs, **kwargs):
                 "the proxy. Configure SECURE_PROXY_SSL_HEADER to match the header "
                 "your proxy sets (commonly "
                 "('HTTP_X_FORWARDED_PROTO', 'https')).",
-                id="bugfixer.E008",
+                id="quorfix.E008",
             )
         ]
     return []
@@ -348,14 +348,14 @@ def check_database(app_configs, **kwargs):
                 f"DATABASES['default']['ENGINE'] is {engine!r}. This stack requires "
                 "PostgreSQL (django.db.backends.postgresql) in production — SQLite "
                 "and other engines are not supported here.",
-                id="bugfixer.E009",
+                id="quorfix.E009",
             )
         )
     if not database.get("NAME"):
         errors.append(
             Error(
                 "DATABASES['default']['NAME'] is empty. Set POSTGRES_DB.",
-                id="bugfixer.E009",
+                id="quorfix.E009",
             )
         )
     if not database.get("HOST"):
@@ -363,7 +363,7 @@ def check_database(app_configs, **kwargs):
             Error(
                 "DATABASES['default']['HOST'] is empty. Production expects a "
                 "network PostgreSQL service — set POSTGRES_HOST.",
-                id="bugfixer.E009",
+                id="quorfix.E009",
             )
         )
     return errors
@@ -380,7 +380,7 @@ def check_redis(app_configs, **kwargs):
                 "The default cache's LOCATION is not a redis:// or rediss:// URL. "
                 "Set REDIS_URL — the shared cache backs throttle counters and the "
                 "analytics cache, and must be a real Redis instance in production.",
-                id="bugfixer.E010",
+                id="quorfix.E010",
             )
         )
     broker = getattr(settings, "CELERY_BROKER_URL", "") or ""
@@ -388,7 +388,7 @@ def check_redis(app_configs, **kwargs):
         errors.append(
             Error(
                 "CELERY_BROKER_URL is not a redis:// or rediss:// URL. Set REDIS_URL.",
-                id="bugfixer.E010",
+                id="quorfix.E010",
             )
         )
     # CELERY_RESULT_BACKEND is validated only if set: nothing in this codebase
@@ -399,7 +399,7 @@ def check_redis(app_configs, **kwargs):
         errors.append(
             Error(
                 "CELERY_RESULT_BACKEND is set but is not a redis:// or rediss:// URL.",
-                id="bugfixer.E010",
+                id="quorfix.E010",
             )
         )
     return errors
@@ -414,7 +414,7 @@ def check_attachments_root(app_configs, **kwargs):
             Error(
                 "ATTACHMENTS_LOCAL_ROOT is empty. Set ATTACHMENTS_LOCAL_ROOT to a "
                 "persistent, absolute path backed by a durable volume.",
-                id="bugfixer.E011",
+                id="quorfix.E011",
             )
         ]
     if not Path(root).is_absolute():
@@ -422,7 +422,7 @@ def check_attachments_root(app_configs, **kwargs):
             Error(
                 f"ATTACHMENTS_LOCAL_ROOT ({root!r}) is not an absolute path. Set it "
                 "to an absolute path backed by a durable volume.",
-                id="bugfixer.E011",
+                id="quorfix.E011",
             )
         ]
     if any(root == prefix or root.startswith(prefix + "/") for prefix in _TEMP_ROOT_PREFIXES):
@@ -432,7 +432,7 @@ def check_attachments_root(app_configs, **kwargs):
                 "directory. Uploaded attachments would be lost on reboot or "
                 "container recreation — point it at a persistent, durable volume "
                 "instead.",
-                id="bugfixer.E011",
+                id="quorfix.E011",
             )
         ]
     return []
@@ -446,14 +446,14 @@ def check_analytics_cache_ttl(app_configs, **kwargs):
         return [
             Error(
                 f"ANALYTICS_CACHE_TTL_SECONDS ({ttl!r}) is not an integer.",
-                id="bugfixer.E012",
+                id="quorfix.E012",
             )
         ]
     if ttl <= 0:
         return [
             Error(
                 f"ANALYTICS_CACHE_TTL_SECONDS ({ttl}) must be greater than zero.",
-                id="bugfixer.E012",
+                id="quorfix.E012",
             )
         ]
     if ttl > MAX_ANALYTICS_CACHE_TTL_SECONDS:
@@ -462,7 +462,7 @@ def check_analytics_cache_ttl(app_configs, **kwargs):
                 f"ANALYTICS_CACHE_TTL_SECONDS ({ttl}) exceeds the production-sane "
                 f"upper bound of {MAX_ANALYTICS_CACHE_TTL_SECONDS} seconds (24 "
                 "hours).",
-                id="bugfixer.E012",
+                id="quorfix.E012",
             )
         ]
     return []

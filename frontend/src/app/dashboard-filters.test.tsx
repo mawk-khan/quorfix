@@ -8,7 +8,7 @@ import type { DashboardFiltersValue } from "@/lib/dashboard/use-dashboard-filter
 import { DashboardFilters } from "./dashboard-filters";
 
 const projects: ActiveProject[] = [
-  { id: "p1", key: "BFW", name: "Bug Fixer Web", status: "active", total_bugs: 5, open_bugs: 2 },
+  { id: "p1", key: "BFW", name: "Quorfix Web", status: "active", total_bugs: 5, open_bugs: 2 },
 ];
 
 const baseFilters: DashboardFiltersValue = {

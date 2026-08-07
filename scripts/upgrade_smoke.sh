@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/upgrade_smoke.sh — non-destructive post-upgrade smoke check for
-# Bug Fixer's production Compose stack. See docs/UPGRADING.md step "Run
+# Quorfix's production Compose stack. See docs/UPGRADING.md step "Run
 # post-upgrade smoke tests".
 #
 # Usage:

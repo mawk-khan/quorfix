@@ -6,7 +6,7 @@
 # the Makefile). This script only proves the process can safely start:
 #
 #   1. `manage.py check` — runs Django's system checks, including every
-#      apps.core.checks bugfixer.E0xx production check from Phase 6 Chunk B.
+#      apps.core.checks quorfix.E0xx production check from Phase 6 Chunk B.
 #      Neither gunicorn nor celery invoke this on their own, so without this
 #      step a misconfigured production container would start "successfully"
 #      and only fail at runtime, defeating the point of those checks.

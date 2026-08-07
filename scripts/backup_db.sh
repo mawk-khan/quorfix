@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/backup_db.sh — PostgreSQL backup for Bug Fixer's production
+# scripts/backup_db.sh — PostgreSQL backup for Quorfix's production
 # Compose stack (docker-compose.prod.yml's `db` service).
 #
 # Usage:

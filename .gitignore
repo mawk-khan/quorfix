@@ -42,5 +42,9 @@ Thumbs.db
 # conventional recovery-set directory name in case one ever ends up here
 # anyway (e.g. a relative destination path passed by mistake). Narrow and
 # specific on purpose — not a blanket *.dump/*.tar.gz pattern, which could
-# hide legitimate test fixtures using those extensions.
+# hide legitimate test fixtures using those extensions. Both prefixes are
+# ignored — quorfix-backup-* is what new backups create; bugfixer-backup-*
+# is kept for anyone with a pre-rename recovery set still sitting around
+# locally (see docs/BACKUP_AND_RESTORE.md "Naming compatibility").
+quorfix-backup-*/
 bugfixer-backup-*/

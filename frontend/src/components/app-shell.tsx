@@ -6,6 +6,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 
 import { logout } from "@/lib/api/auth";
 import { useSession } from "@/lib/auth/session-provider";
+import { PRODUCT_NAME } from "@/lib/branding";
 
 import { NotificationBell } from "./notification-bell";
 
@@ -78,7 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         >
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <Link href="/" className="font-semibold">
-              Bug Fixer
+              {PRODUCT_NAME}
             </Link>
             <ul className="flex flex-wrap items-center gap-4 text-sm">
               {navLinks.map((link) => {

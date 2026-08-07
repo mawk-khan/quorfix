@@ -2,7 +2,7 @@
 
 > Update this document whenever a phase changes routes, credentials, roles, setup commands, demo data, or available functionality.
 
-This is the permanent reference for logging into a local Bug Fixer instance and manually
+This is the permanent reference for logging into a local Quorfix instance and manually
 exercising everything that has been built so far. It is updated at the end of every completed
 phase or chunk (see the "Completed phases" section below), per the working-procedure rule in
 [CLAUDE.md](../CLAUDE.md).
@@ -140,7 +140,7 @@ under production settings).
 
 | Role | Email | Password |
 | --- | --- | --- |
-| Administrator | admin@bugfixer.local | BugFixerDemo2026! |
+| Administrator | admin@bugfixer.local | QuorfixDemo2026! |
 | Developer | developer@bugfixer.local | DeveloperDemo2026! |
 | QA | qa@bugfixer.local | QADemo2026! |
 | Reporter | reporter@bugfixer.local | ReporterDemo2026! |
@@ -396,7 +396,9 @@ affected by the date range", etc.) — the date filter never silently does nothi
 - **Commit:** _(this change — update once committed)_
 - **Main functionality:** PostgreSQL and local-attachment backup/restore for
   `docker-compose.prod.yml`, treated as one coordinated recovery set. `scripts/backup.sh`
-  produces a timestamped `bugfixer-backup-<UTC timestamp>/` directory
+  produces a timestamped `quorfix-backup-<UTC timestamp>/` directory (a pre-rename
+  `bugfixer-backup-<UTC timestamp>/` recovery set restores identically — see
+  `docs/BACKUP_AND_RESTORE.md` "Naming compatibility")
   (`manifest.txt`, `database.dump`, `attachments.tar.gz`, `checksums.sha256`);
   `scripts/restore_db.sh`/`scripts/restore_attachments.sh` restore one artifact each, both
   requiring an explicit `--confirm-restore` flag and validating checksum + manifest before
@@ -598,6 +600,89 @@ affected by the date range", etc.) — the date filter never silently does nothi
   `request_id` field, since that log line is written after `RequestIdMiddleware`'s own context
   has already cleared; no metrics/tracing integration exists yet.
 
+### Phase 6 Chunk K: Quorfix branding migration and Community release documentation
+- **Status:** Complete
+- **Commit:** _(this change — update once committed)_
+- **Product name:** Quorfix (previously "Bug Fixer" — this chunk is the rename).
+- **Official domain:** quorfix.com *(not yet confirmed live — do not assume DNS/TLS/email/hosting
+  are configured; see `docs/INSTALLATION.md` "Required origins")*.
+- **Official repository:** https://github.com/mawk-khan/quorfix
+- **Current version:** `0.5.0-beta.1` (see root `VERSION` file — the single source of truth;
+  not yet tagged).
+- **Main functionality:** A full audit (319 case-insensitive "bug fixer"/"bugfixer" matches
+  across 55 tracked files) classified every match before anything changed — see this chunk's
+  own completion report for the full table. User-facing text (page titles, AppShell, setup/
+  sign-in headings, invitation email subject, OpenAPI title/description, LICENSE copyright,
+  system-check IDs `quorfix.E0xx`, `SERVICE_NAME`/Celery app name defaults, browser tab titles
+  via a new `usePageTitle` hook — see `frontend/src/lib/use-page-title.ts`) now says Quorfix.
+  Compatibility-sensitive identifiers were deliberately **not** renamed: `BUGFIXER_DISPOSABLE_DATABASE`
+  (established env var), demo emails (still `@bugfixer.local` — intentional, see below),
+  `docker-compose.yml`'s Compose project name (`bug-fixer` — renaming it would orphan this
+  environment's own live `postgres_data` volume), and no Django app/migration/table was
+  touched. `seed_demo` now recognizes *either* the current (`quorfix-demo`) or the pre-rename
+  (`bug-fixer-demo`) organization slug — an existing local dev database is reused, never
+  silently renamed or duplicated. New backups use a `quorfix-backup-` prefix; restore tooling
+  never validated any directory-name prefix to begin with, so a pre-rename `bugfixer-backup-`
+  recovery set restores identically (see `docs/BACKUP_AND_RESTORE.md` "Naming compatibility").
+  New root-level docs created: `docs/INSTALLATION.md`, `docs/RELEASING.md`,
+  `THIRD_PARTY_NOTICES.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
+  `.github/ISSUE_TEMPLATE/*`, `.github/PULL_REQUEST_TEMPLATE.md`. `.github/workflows/release.yml`
+  hardened: validates the pushed tag equals `v$(cat VERSION)` (not just the `vX.Y.Z` shape), now
+  requires `backend.yml`/`frontend.yml` to pass in full (via `workflow_call`) before building
+  anything, smoke-tests the *actual* images about to be pushed (not a separately-built copy),
+  and uses `quorfix-backend`/`quorfix-frontend` GHCR naming. `backend/requirements-dev.txt`'s
+  `pytest` upgraded 8.3.4 → 9.1.1, resolving PYSEC-2026-1845 — `pytest-django` deliberately kept
+  at 4.9.0 (4.13.0 has a reproducible incompatibility with pytest 9 against this project's own
+  suite; see that file's own comment). Backend development-dependency `pip-audit` is now a
+  second, separately-blocking CI step (previously unscanned in CI). No routes, roles, or API
+  paths changed.
+- **Demo credentials:** unchanged in substance — `admin@bugfixer.local` (still `.local`,
+  intentionally — see below) / `QuorfixDemo2026!` (password re-branded; `seed_demo` reconciles
+  it idempotently on re-run, same as every other persona field). Developer/QA/reporter/viewer
+  passwords were never "Bug Fixer"-branded and are unchanged. See the credentials table below.
+- **Why demo emails stay `@bugfixer.local`:** these are local-development-only, publicly
+  documented, non-production identifiers (`seed_demo` refuses to run under production settings
+  outright). Renaming the email domain has no security or branding benefit proportional to the
+  risk of silently breaking anyone's existing local fixtures/scripts that already reference
+  `@bugfixer.local` literally — kept for the beta; revisit post-beta if desired.
+- **Security contact status:** still a placeholder
+  (`security@REPLACE-ME-quorfix.example`) — **release blocker**, see `docs/SECURITY.md`.
+- **Code of Conduct contact status:** still a placeholder
+  (`conduct@REPLACE-ME-quorfix.example`) — **release blocker**, see `CODE_OF_CONDUCT.md`.
+- **Clean-install guide:** `docs/INSTALLATION.md`.
+- **Release guide:** `docs/RELEASING.md` (procedure only — no release has been executed).
+- **Contribution guide:** `CONTRIBUTING.md`.
+- **Beta limitations:** see `CHANGELOG.md`'s `[0.5.0-beta.1]` entry for the full, versioned list
+  (single organization per install, local-only attachment storage, UTC analytics boundaries,
+  `OFFSET` deep-page cost, limited concurrent-load testing, no zero-downtime guarantee, reverse
+  proxy/TLS required, no Professional features, no formal WCAG certification, the two
+  unresolved contact blockers above).
+- **Final local test commands for this chunk:**
+  ```sh
+  # Backend
+  docker compose exec backend ruff format --check .
+  docker compose exec backend ruff check .
+  docker compose exec backend pytest
+  docker compose exec backend pip-audit -r requirements.txt
+  docker compose exec backend pip-audit -r requirements-dev.txt
+  docker compose exec backend python manage.py makemigrations --check --dry-run
+
+  # Frontend
+  docker compose exec frontend npm run lint
+  docker compose exec frontend npm run typecheck
+  docker compose exec frontend npm test
+  docker compose exec frontend npm run build
+  docker compose exec frontend npm audit --audit-level=high
+
+  # Docs / release tooling
+  bash scripts/check_docs.sh
+  bash scripts/check_version_consistency.sh
+  bash scripts/tests/test_backup_restore_guards.sh
+
+  # Docker (build only — never publishes)
+  make ci-images
+  ```
+
 ## Manual test checklist
 
 **First-run setup**
@@ -796,7 +881,7 @@ docker compose logs -f celery_worker
 
 **PostgreSQL readiness**
 ```bash
-docker compose exec db pg_isready -U ${POSTGRES_USER:-bugfixer}
+docker compose exec db pg_isready -U ${POSTGRES_USER:-quorfix}
 ```
 
 **Redis readiness**

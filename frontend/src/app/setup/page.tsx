@@ -8,7 +8,9 @@ import { useForm } from "react-hook-form";
 import { ApiError } from "@/lib/api/client";
 import { getSetupStatus, submitSetup } from "@/lib/api/setup";
 import { useSession } from "@/lib/auth/session-provider";
+import { PRODUCT_NAME } from "@/lib/branding";
 import { errorProps } from "@/lib/forms/error-props";
+import { usePageTitle } from "@/lib/use-page-title";
 import { setupSchema, type SetupFormValues } from "@/lib/validation/setup";
 
 export default function SetupPage() {
@@ -16,6 +18,7 @@ export default function SetupPage() {
   const { refetch } = useSession();
   const [checking, setChecking] = useState(true);
   const [formError, setFormError] = useState<string | null>(null);
+  usePageTitle("Set up");
 
   const {
     register,
@@ -63,9 +66,9 @@ export default function SetupPage() {
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="w-full max-w-sm space-y-4"
-        aria-label="Set up Bug Fixer"
+        aria-label={`Set up ${PRODUCT_NAME}`}
       >
-        <h1 className="text-xl font-semibold">Set up Bug Fixer</h1>
+        <h1 className="text-xl font-semibold">Set up {PRODUCT_NAME}</h1>
         <p className="text-sm text-gray-500">
           Create the first administrator account and organization.
         </p>

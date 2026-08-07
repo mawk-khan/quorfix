@@ -10,6 +10,7 @@ import { listBugs } from "@/lib/api/bugs";
 import { ApiError } from "@/lib/api/client";
 import { listProjects } from "@/lib/api/projects";
 import { useSession } from "@/lib/auth/session-provider";
+import { usePageTitle } from "@/lib/use-page-title";
 
 import { BugFilters, type BugFiltersValue } from "./bug-filters";
 import { BugTable } from "./bug-table";
@@ -28,6 +29,7 @@ function describeError(error: unknown): string {
 }
 
 export default function BugsPage() {
+  usePageTitle("Bugs");
   return (
     // useSearchParams() opts this page out of static prerendering unless
     // wrapped in Suspense — matches the pattern in app/projects/page.tsx.

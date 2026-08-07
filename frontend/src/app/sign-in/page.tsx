@@ -9,12 +9,14 @@ import { login } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { useSession } from "@/lib/auth/session-provider";
 import { errorProps } from "@/lib/forms/error-props";
+import { usePageTitle } from "@/lib/use-page-title";
 import { loginSchema, type LoginFormValues } from "@/lib/validation/auth";
 
 export default function SignInPage() {
   const router = useRouter();
   const { refetch } = useSession();
   const [formError, setFormError] = useState<string | null>(null);
+  usePageTitle("Sign in");
 
   const {
     register,

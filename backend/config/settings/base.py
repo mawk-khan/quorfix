@@ -6,6 +6,15 @@ from apps.core.log_context import build_logging_config
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
+# Product-facing name — a plain constant, not an environment variable: this
+# is static branding (Phase 6 Chunk K), not per-deployment configuration, so
+# it doesn't need the indirection get_bool/get_choice's env-driven siblings
+# use. Referenced anywhere the backend needs to say the product's name in
+# something a user reads (invitation email subject, OpenAPI docs title) —
+# see docs/OBSERVABILITY.md's SERVICE_NAME for the separate, *operational*
+# (log/process) name, which stays environment-configurable on purpose.
+PRODUCT_NAME = "Quorfix"
+
 # Safe fallback only — every concrete settings module (development/test/
 # production) sets this explicitly to its own literal value below, so this
 # is only ever consulted if a future settings module forgets to. It must
@@ -94,8 +103,8 @@ ASGI_APPLICATION = "config.asgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.environ.get("POSTGRES_DB", "bugfixer"),
-        "USER": os.environ.get("POSTGRES_USER", "bugfixer"),
+        "NAME": os.environ.get("POSTGRES_DB", "quorfix"),
+        "USER": os.environ.get("POSTGRES_USER", "quorfix"),
         "PASSWORD": os.environ.get("POSTGRES_PASSWORD", ""),
         "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
         "PORT": os.environ.get("POSTGRES_PORT", "5432"),
@@ -157,7 +166,7 @@ CELERY_WORKER_HIJACK_ROOT_LOGGER = False
 # against a fixed, hardcoded set of choices (get_choice/get_log_level raise
 # ImproperlyConfigured on anything else) — never used to import or construct
 # a class from an arbitrary environment string. See docs/OBSERVABILITY.md.
-SERVICE_NAME = os.environ.get("SERVICE_NAME", "bugfixer-backend")
+SERVICE_NAME = os.environ.get("SERVICE_NAME", "quorfix-backend")
 REQUEST_ID_HEADER = os.environ.get("REQUEST_ID_HEADER", "X-Request-ID")
 LOG_FORMAT = get_choice("LOG_FORMAT", "json", ("json", "text", "plain"))
 LOG_LEVEL = get_log_level("LOG_LEVEL", "INFO")
@@ -231,8 +240,12 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "webmaster@localhost")
 ANALYTICS_CACHE_TTL_SECONDS = get_int("ANALYTICS_CACHE_TTL_SECONDS", 60)
 
 SPECTACULAR_SETTINGS = {
-    "TITLE": "Bug Fixer API",
-    "DESCRIPTION": "Bug Fixer Community REST API",
+    "TITLE": f"{PRODUCT_NAME} API",
+    "DESCRIPTION": f"{PRODUCT_NAME} Community REST API",
+    # Deliberately independent of the product release version (VERSION file
+    # / docs/RELEASING.md) — this is the OpenAPI *schema's* own version, and
+    # this project has never introduced a breaking API-shape change that
+    # would warrant bumping it; see docs/RELEASING.md if that ever changes.
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }

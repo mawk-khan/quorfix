@@ -25,7 +25,7 @@ let inviteUrl = "";
 test.describe.serial("first-run setup through team management", () => {
   test("a fresh instance requires setup", async ({ page }) => {
     await page.goto("/setup");
-    await expect(page.getByRole("heading", { name: /set up bug fixer/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /set up quorfix/i })).toBeVisible();
   });
 
   test("completing setup creates the org and signs the admin in", async ({ page }) => {

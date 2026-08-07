@@ -51,7 +51,9 @@ ENV NODE_ENV=production
 
 ARG VERSION=dev
 ARG VCS_REF=unknown
-LABEL org.opencontainers.image.source="git@bitbucket-claude:aivah/bug-fixer.git" \
+LABEL org.opencontainers.image.title="Quorfix frontend" \
+      org.opencontainers.image.description="Quorfix Community frontend (Next.js standalone server)" \
+      org.opencontainers.image.source="https://github.com/mawk-khan/quorfix" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.version="${VERSION}"
 

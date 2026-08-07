@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api/client";
 import { listProjects } from "@/lib/api/projects";
 import { useSession } from "@/lib/auth/session-provider";
 import { errorProps } from "@/lib/forms/error-props";
+import { usePageTitle } from "@/lib/use-page-title";
 import { BUG_PRIORITIES, BUG_SEVERITIES, createBugSchema, type CreateBugFormValues } from "@/lib/validation/bugs";
 
 function describeError(error: unknown): string {
@@ -25,6 +26,7 @@ function describeError(error: unknown): string {
 }
 
 export default function NewBugPage() {
+  usePageTitle("New bug");
   const { session, isLoading: sessionLoading } = useSession();
   const canCreate = session?.role !== null && session?.role !== "viewer";
   const router = useRouter();

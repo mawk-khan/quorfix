@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/backup.sh — coordinated PostgreSQL + local-attachments backup for
-# Bug Fixer's production Compose stack. Treats the database and the
+# Quorfix's production Compose stack. Treats the database and the
 # attachment volume as one recovery set: see docs/BACKUP_AND_RESTORE.md for
 # why they must always be backed up and restored together, and for this
 # script's consistency limitations (it does not stop application traffic,
@@ -13,11 +13,19 @@
 # Writes a new, timestamped recovery-set directory under
 # <destination-parent-dir>:
 #
-#   bugfixer-backup-YYYYmmddTHHMMSSZ/
+#   quorfix-backup-YYYYmmddTHHMMSSZ/
 #     manifest.txt
 #     database.dump
 #     attachments.tar.gz
 #     checksums.sha256
+#
+# Naming compatibility: this is only the prefix new backups are created
+# with — restore_db.sh/restore_attachments.sh take a direct path to
+# database.dump/attachments.tar.gz and never inspect or require any
+# particular parent-directory name (only manifest.txt's format_version is
+# validated). A pre-rename "bugfixer-backup-..." recovery set restores
+# exactly the same way; see docs/BACKUP_AND_RESTORE.md "Naming
+# compatibility".
 #
 # <destination-parent-dir> is caller-supplied and must already exist —
 # this script never writes into the repository and never invents a
@@ -95,7 +103,7 @@ if command -v df >/dev/null 2>&1; then
 fi
 
 TIMESTAMP="$(utc_timestamp)"
-BACKUP_DIR="${DEST_PARENT%/}/bugfixer-backup-${TIMESTAMP}"
+BACKUP_DIR="${DEST_PARENT%/}/quorfix-backup-${TIMESTAMP}"
 refuse_if_exists "$BACKUP_DIR"
 
 mkdir -- "$BACKUP_DIR"
@@ -147,7 +155,7 @@ fi
 rm -f -- "${BACKUP_DIR}/.migrations-plan.tmp"
 
 cat >"$MANIFEST" <<MANIFEST_EOF
-# Bug Fixer coordinated recovery-set manifest. See docs/BACKUP_AND_RESTORE.md.
+# Quorfix coordinated recovery-set manifest. See docs/BACKUP_AND_RESTORE.md.
 format_version=$MANIFEST_FORMAT_VERSION
 status=in_progress
 timestamp_utc=$TIMESTAMP

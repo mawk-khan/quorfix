@@ -32,7 +32,7 @@ from apps.core.middleware.request_id import NO_REQUEST_ID, bound_request_id, get
 # would only coincidentally work and would break the moment Celery's own
 # value (or ours) changed shape. A namespaced key sidesteps the collision
 # entirely instead of relying on either reading order.
-_CORRELATION_HEADER_KEY = "bugfixer_correlation_id"
+_CORRELATION_HEADER_KEY = "quorfix_correlation_id"
 
 
 def correlation_headers() -> dict:

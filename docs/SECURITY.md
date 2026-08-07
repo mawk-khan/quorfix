@@ -1,14 +1,19 @@
 # Security Policy
 
-Bug Fixer Community is pre-1.0, beta software. This document describes what is and isn't
+Quorfix Community is pre-1.0, beta software. This document describes what is and isn't
 covered, how to report a vulnerability, and the security assumptions this project's
 deployment model relies on. It is not a promise of response time, and it is not a complete
 security audit — see [Known beta limitations](#known-beta-limitations) for what this document
 does not claim.
 
+**RELEASE BLOCKER: no monitored security contact exists yet (see [Reporting a
+vulnerability](#reporting-a-vulnerability)).** A tagged public release must not ship until this
+is resolved — see `docs/RELEASING.md`'s pre-release checklist, which treats this as a hard gate,
+not an advisory note.
+
 ## Supported versions
 
-Bug Fixer Community has not yet cut a tagged release (see `docs/UPGRADING.md`). Until a first
+Quorfix Community has not yet cut a tagged release (see `docs/UPGRADING.md`). Until a first
 release exists, **only the `master` branch is supported** — security fixes land there, not on
 any older commit. Once tagged releases exist, this section will be updated to name which
 release lines receive security fixes, following the upgrade support policy already documented
@@ -25,19 +30,31 @@ appropriate for your use case.
 
 ## Reporting a vulnerability
 
-**Placeholder contact — the project owner must replace this before any public release.**
-There is no working security contact configured yet. Do not rely on the address below; it is
-a placeholder marking where a real one belongs, not a functioning inbox:
+**RELEASE BLOCKER — placeholder contact.** No real, monitored security contact has been
+configured. This repository's own configuration and Git remote metadata were checked
+(Phase 6 Chunk K) specifically looking for an existing one — none was found. The address below
+is a clearly-marked placeholder, not a functioning inbox; nothing in this repository invents or
+assumes a real one:
 
 ```
-security@REPLACE-ME-bugfixer.example
+security@REPLACE-ME-quorfix.example
 ```
 
-Until a real contact is configured, report a suspected vulnerability the same way you would
-report any other bug affecting this repository, but say explicitly in the first line that it's
-a security issue, and avoid posting exploit details in a public issue tracker if the project's
-issue tracker is public — hold the technical details until you've reached a maintainer
-directly.
+A sensible real address, once the project owner has actually set it up, would be
+`security@quorfix.com` — but that address must not be published here as if it works until the
+owner confirms the mailbox (or forwarding rule) exists and is actively monitored. Until then:
+
+- **Do not report a suspected vulnerability through a public GitHub issue.** This repository's
+  issue templates (`.github/ISSUE_TEMPLATE/`) deliberately do not offer a "security" category for
+  exactly this reason.
+- Report a suspected vulnerability the same way you would reach a maintainer for anything
+  sensitive — directly, privately, outside the public issue tracker — and say explicitly in the
+  first line that it's a security issue.
+- Hold technical/exploit details until you've reached a maintainer directly; see [What not to
+  post publicly](#what-not-to-post-publicly).
+
+**This project's release-readiness checklist (`docs/RELEASING.md`) will not be marked complete
+while this section still describes a placeholder.**
 
 **We do not promise a response-time SLA.** This is an unfunded beta project; reports will be
 looked at, not guaranteed a same-day or same-week reply.
@@ -77,7 +94,7 @@ configuration, and the operator scripts under `scripts/`.
   [Dependency scan policy](#dependency-scan-policy) for how this project tracks and remediates
   them once disclosed.
 - Vulnerabilities that require an already-compromised administrator account, an
-  already-compromised database, or physical/root access to the host — Bug Fixer Community
+  already-compromised database, or physical/root access to the host — Quorfix Community
   trusts its own administrators and its own infrastructure, the same as almost all
   self-hosted software.
 - Denial of service via raw traffic volume (that's infrastructure/hosting's responsibility,
@@ -94,7 +111,7 @@ cloud-neutral example, not a complete, hardened production deployment on its own
   things this repository's containers deliberately don't: TLS termination, HSTS (see below),
   and any additional network-layer protections the operator's environment needs.
 - The Docker host itself is reasonably secured — SSH access, OS patching, and host firewalling
-  are the operator's responsibility, not something Bug Fixer Community's own containers can
+  are the operator's responsibility, not something Quorfix Community's own containers can
   enforce from inside themselves.
 - `.env` (and the secrets in it — `DJANGO_SECRET_KEY`, `POSTGRES_PASSWORD`, SMTP credentials)
   is kept outside version control and readable only by whoever operates the deployment. Nothing
@@ -104,7 +121,7 @@ cloud-neutral example, not a complete, hardened production deployment on its own
 
 ### HTTPS / reverse-proxy responsibility
 
-Bug Fixer Community's own containers **do not terminate TLS and do not send
+Quorfix Community's own containers **do not terminate TLS and do not send
 `Strict-Transport-Security`**. `frontend/next.config.ts` sends a set of security response
 headers (see below) but deliberately excludes HSTS — see that file's own comment for exactly
 why: this server is never the TLS-terminating edge in the deployment shape
@@ -182,6 +199,8 @@ See `docs/BACKUP_AND_RESTORE.md` in full. Summarized:
 
 Documented honestly rather than left implicit:
 
+- **No monitored security contact exists yet — this blocks a public release** (see [Reporting a
+  vulnerability](#reporting-a-vulnerability)). Not merely undocumented; actively unresolved.
 - No independent third-party security audit has been performed.
 - No malware/virus scanning of uploaded attachments (see above).
 - `pip-audit`/`npm audit` findings are tracked and remediated on a best-effort basis (see

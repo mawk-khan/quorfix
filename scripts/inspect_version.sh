@@ -8,11 +8,14 @@
 # Usage:
 #   scripts/inspect_version.sh [IMAGE_TAG]
 #
-# IMAGE_TAG defaults to the VERSION environment variable, or "local" if
-# unset — matching docker-compose.prod.yml's own
-# bugfixer-backend:${VERSION:-local} / bugfixer-frontend:${VERSION:-local}
-# image tags, so `VERSION=1.2.3 scripts/inspect_version.sh` inspects
-# exactly the images that VERSION would build/run.
+# IMAGE_TAG defaults to the VERSION environment variable if set, otherwise
+# the repo's own root VERSION file (the single source of truth — see
+# docs/RELEASING.md), otherwise "local" — matching docker-compose.prod.yml's
+# own quorfix-backend:${VERSION:-local} / quorfix-frontend:${VERSION:-local}
+# image tags, so `VERSION=1.2.3 scripts/inspect_version.sh` inspects exactly
+# the images that VERSION would build/run, and a bare invocation with no
+# VERSION env var set inspects exactly what `make prod-build` (which reads
+# the same file) would have produced.
 #
 # A missing image or a missing label is reported, not treated as an error
 # that aborts the whole check — each is independent, and the exit code
@@ -21,12 +24,14 @@
 set -uo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
 # shellcheck source=lib/common.sh
 . "$SCRIPT_DIR/lib/common.sh"
 
 require_cmd docker
 
-TAG="${1:-${VERSION:-local}}"
+VERSION_FILE_CONTENT="$(cat "$REPO_ROOT/VERSION" 2>/dev/null || true)"
+TAG="${1:-${VERSION:-${VERSION_FILE_CONTENT:-local}}}"
 
 print_labels() {
   image="$1"
@@ -46,6 +51,6 @@ print_labels() {
 }
 
 status=0
-print_labels "bugfixer-backend:${TAG}" || status=1
-print_labels "bugfixer-frontend:${TAG}" || status=1
+print_labels "quorfix-backend:${TAG}" || status=1
+print_labels "quorfix-frontend:${TAG}" || status=1
 exit "$status"

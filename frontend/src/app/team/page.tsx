@@ -9,6 +9,7 @@ import { cancelInvitation, createInvitation, listInvitations } from "@/lib/api/i
 import { listMembers, removeMember, updateMemberRole } from "@/lib/api/members";
 import type { CommunityRole } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session-provider";
+import { usePageTitle } from "@/lib/use-page-title";
 
 import { InviteForm } from "./invite-form";
 import { MembersTable } from "./members-table";
@@ -26,6 +27,7 @@ function describeError(error: unknown): string {
 }
 
 export default function TeamPage() {
+  usePageTitle("Team");
   const { session, isLoading: sessionLoading } = useSession();
   const isAdmin = session?.role === "administrator";
   const queryClient = useQueryClient();

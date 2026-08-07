@@ -1,6 +1,6 @@
 # Upgrading
 
-Upgrade, migration, and rollback procedure for Bug Fixer Community's production Compose
+Upgrade, migration, and rollback procedure for Quorfix Community's production Compose
 stack (`docker-compose.prod.yml`). This document assumes you have already read
 [docs/BACKUP_AND_RESTORE.md](./BACKUP_AND_RESTORE.md) — it links to that runbook rather than
 repeating it.
@@ -156,8 +156,8 @@ If this fails, stop — do not proceed to building/deploying the target images.
 ```bash
 make prod-build
 # or, if pulling from a registry instead of building locally, tag/pull the target
-# VERSION so docker-compose.prod.yml's bugfixer-backend:${VERSION:-local} /
-# bugfixer-frontend:${VERSION:-local} resolve to the target images.
+# VERSION so docker-compose.prod.yml's quorfix-backend:${VERSION:-local} /
+# quorfix-frontend:${VERSION:-local} resolve to the target images.
 ```
 
 Confirm what you actually built/pulled before going further:
@@ -367,7 +367,7 @@ version before it:**
   with "Permission denied" and the container never comes up. This only applies to that specific
   version boundary, not to any upgrade between two already-non-root versions.
 
-None of Bug Fixer Community's actual migrations have changed between any released version yet
+None of Quorfix Community's actual migrations have changed between any released version yet
 (no version transition has shipped) — this section will grow as real releases happen.
 
 ---
@@ -380,7 +380,7 @@ build args and set them as OCI labels (`org.opencontainers.image.version`,
 `scripts/inspect_version.sh` (`make prod-version`) reads them back:
 
 ```bash
-scripts/inspect_version.sh          # inspects bugfixer-{backend,frontend}:${VERSION:-local}
+scripts/inspect_version.sh          # inspects quorfix-{backend,frontend}:${VERSION:-local}
 scripts/inspect_version.sh 1.2.3    # inspects a specific tag
 ```
 

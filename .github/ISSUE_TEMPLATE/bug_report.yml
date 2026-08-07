@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a problem with Quorfix Community
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        **Do not use this template to report a security vulnerability.** See
+        [docs/SECURITY.md](https://github.com/mawk-khan/quorfix/blob/master/docs/SECURITY.md)
+        for how to report those privately instead.
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: A clear description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: As concrete as possible — the exact endpoint/page, account role, and payload if relevant.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Git SHA (see `scripts/inspect_version.sh`) or release tag, once tags exist.
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - Local development (docker-compose.yml)
+        - Production-oriented Compose (docker-compose.prod.yml)
+        - Other (describe below)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: |
+        See docs/OBSERVABILITY.md for how to find the request ID and grep logs by it.
+        Remove/redact anything sensitive before pasting — never paste real credentials,
+        session cookies, CSRF tokens, or another user's private data.
+      render: shell
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional context

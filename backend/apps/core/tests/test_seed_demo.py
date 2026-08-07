@@ -51,7 +51,7 @@ def test_refuses_to_seed_when_a_different_organization_is_already_configured(org
     with pytest.raises(CommandError):
         call_command("seed_demo")
 
-    assert not Organization.objects.filter(slug="bug-fixer-demo").exists()
+    assert not Organization.objects.filter(slug="quorfix-demo").exists()
     assert Organization.objects.count() == 1
 
 
@@ -59,8 +59,8 @@ def test_refuses_to_seed_when_a_different_organization_is_already_configured(org
 def test_creates_organization_members_and_projects():
     run_seed_demo()
 
-    organization = Organization.objects.get(slug="bug-fixer-demo")
-    assert organization.name == "Bug Fixer Demo"
+    organization = Organization.objects.get(slug="quorfix-demo")
+    assert organization.name == "Quorfix Demo"
 
     memberships = {
         m.user.email: m
@@ -78,7 +78,7 @@ def test_creates_organization_members_and_projects():
     admin_user = memberships["admin@bugfixer.local"].user
     assert admin_user.first_name == "Demo"
     assert admin_user.last_name == "Administrator"
-    assert admin_user.check_password("BugFixerDemo2026!")
+    assert admin_user.check_password("QuorfixDemo2026!")
 
     developer_user = memberships["developer@bugfixer.local"].user
     assert developer_user.check_password("DeveloperDemo2026!")
@@ -86,7 +86,7 @@ def test_creates_organization_members_and_projects():
     projects = {p.key: p for p in Project.objects.filter(organization=organization)}
     assert set(projects) == {"BFW", "MOB", "API"}
 
-    assert projects["BFW"].name == "Bug Fixer Web Application"
+    assert projects["BFW"].name == "Quorfix Web Application"
     assert projects["BFW"].status == ProjectStatus.ACTIVE
     assert projects["BFW"].lead_id == admin_user.pk
     assert projects["BFW"].archived_at is None
@@ -101,11 +101,45 @@ def test_creates_organization_members_and_projects():
 
 
 @pytest.mark.django_db
+def test_reuses_a_pre_rename_legacy_organization_without_renaming_or_duplicating_it():
+    """A local dev database seeded before the Quorfix rebrand has an
+    organization at the old "bug-fixer-demo" slug. Re-running seed_demo
+    against it must find and reuse that exact organization — never create a
+    second "quorfix-demo" one (Community allows only one organization, so
+    that would just fail outright) and never rename the existing one out
+    from under whatever the operator already has bookmarked/configured."""
+    from apps.organizations.services import setup_instance
+
+    admin_persona_email = "admin@bugfixer.local"
+    user, legacy_organization, _membership = setup_instance(
+        organization_name="Bug Fixer Demo",
+        email=admin_persona_email,
+        password="whatever-was-seeded-before",
+        first_name="Demo",
+        last_name="Administrator",
+    )
+    assert legacy_organization.slug == "bug-fixer-demo"
+
+    run_seed_demo()
+
+    assert Organization.objects.count() == 1
+    reused = Organization.objects.get()
+    assert reused.pk == legacy_organization.pk
+    assert reused.slug == "bug-fixer-demo"  # not renamed to "quorfix-demo"
+    assert reused.name == "Bug Fixer Demo"  # not renamed either
+
+    # The rest of seed_demo's convergence still ran normally against the
+    # reused (legacy-slugged) organization — members/projects/bugs exist.
+    assert OrganizationMembership.objects.filter(organization=reused).count() == 5
+    assert Project.objects.filter(organization=reused).count() == 3
+
+
+@pytest.mark.django_db
 class TestDemoBugs:
     def test_creates_a_reasonable_number_of_bugs_across_projects_statuses_and_people(self):
         run_seed_demo()
 
-        organization = Organization.objects.get(slug="bug-fixer-demo")
+        organization = Organization.objects.get(slug="quorfix-demo")
         bugs = list(
             Bug.objects.filter(organization=organization).select_related(
                 "project", "reporter", "assignee"
@@ -134,7 +168,7 @@ class TestDemoBugs:
     def test_uses_the_real_create_bug_service_numbering(self):
         run_seed_demo()
 
-        organization = Organization.objects.get(slug="bug-fixer-demo")
+        organization = Organization.objects.get(slug="quorfix-demo")
         bfw = Project.objects.get(organization=organization, key="BFW")
         bfw_bugs = sorted(Bug.objects.filter(project=bfw), key=lambda b: b.number)
 
@@ -146,7 +180,7 @@ class TestDemoBugs:
     def test_duplicate_bug_is_linked_to_its_target(self):
         run_seed_demo()
 
-        organization = Organization.objects.get(slug="bug-fixer-demo")
+        organization = Organization.objects.get(slug="quorfix-demo")
         duplicate = Bug.objects.get(
             organization=organization, title="Dashboard chart issue reported twice"
         )
@@ -165,7 +199,7 @@ class TestDemoBugs:
     def test_bugs_are_backdated_across_roughly_the_last_45_days(self):
         run_seed_demo()
 
-        organization = Organization.objects.get(slug="bug-fixer-demo")
+        organization = Organization.objects.get(slug="quorfix-demo")
         bugs = Bug.objects.filter(organization=organization)
 
         ages_in_days = [(timezone.now() - b.created_at).days for b in bugs]
@@ -178,7 +212,7 @@ class TestDemoBugs:
     def test_has_at_least_one_overdue_bug(self):
         run_seed_demo()
 
-        organization = Organization.objects.get(slug="bug-fixer-demo")
+        organization = Organization.objects.get(slug="quorfix-demo")
         from apps.bugs.workflow import OPEN_STATUSES
 
         overdue = Bug.objects.filter(
@@ -191,7 +225,7 @@ class TestDemoBugs:
     def test_has_a_bug_with_reopened_history(self):
         run_seed_demo()
 
-        organization = Organization.objects.get(slug="bug-fixer-demo")
+        organization = Organization.objects.get(slug="quorfix-demo")
         from apps.activities.models import ActivityVerb
 
         reopened_bug_ids = Bug.objects.filter(
@@ -204,7 +238,7 @@ class TestDemoBugs:
     def test_resolved_bugs_have_a_backdated_resolution_activity(self):
         run_seed_demo()
 
-        organization = Organization.objects.get(slug="bug-fixer-demo")
+        organization = Organization.objects.get(slug="quorfix-demo")
         bug = Bug.objects.get(
             organization=organization,
             title="Password reset email arrives several minutes late",
@@ -225,7 +259,7 @@ class TestDemoBugs:
     def test_repeated_seeding_does_not_duplicate_bugs_or_disturb_numbering(self):
         run_seed_demo()
 
-        organization = Organization.objects.get(slug="bug-fixer-demo")
+        organization = Organization.objects.get(slug="quorfix-demo")
         count_after_first_run = Bug.objects.filter(organization=organization).count()
         numbers_after_first_run = {
             (b.project.key, b.number)
@@ -255,7 +289,7 @@ def test_is_idempotent_across_repeated_runs():
     run_seed_demo()
     run_seed_demo()
 
-    assert Organization.objects.filter(slug="bug-fixer-demo").count() == 1
+    assert Organization.objects.filter(slug="quorfix-demo").count() == 1
     assert OrganizationMembership.objects.count() == 5
     assert Project.objects.count() == 3
 
@@ -264,7 +298,7 @@ def test_is_idempotent_across_repeated_runs():
 def test_reconverges_data_that_drifted_between_runs():
     run_seed_demo()
 
-    organization = Organization.objects.get(slug="bug-fixer-demo")
+    organization = Organization.objects.get(slug="quorfix-demo")
     dev_membership = OrganizationMembership.objects.select_related("user").get(
         organization=organization, user__email="developer@bugfixer.local"
     )
@@ -296,7 +330,7 @@ def test_reconverges_an_archived_demo_project():
 
     from apps.projects.services import archive_project
 
-    organization = Organization.objects.get(slug="bug-fixer-demo")
+    organization = Organization.objects.get(slug="quorfix-demo")
     project = Project.objects.get(organization=organization, key="API")
     archive_project(project=project)
 
@@ -311,7 +345,7 @@ def test_reconverges_an_archived_demo_project():
 def test_recovers_from_a_stale_pending_invitation_left_by_an_interrupted_run():
     run_seed_demo()
 
-    organization = Organization.objects.get(slug="bug-fixer-demo")
+    organization = Organization.objects.get(slug="quorfix-demo")
     reporter_membership = OrganizationMembership.objects.select_related("user").get(
         organization=organization, user__email="reporter@bugfixer.local"
     )
@@ -376,7 +410,7 @@ def test_recovers_from_a_stale_pending_invitation_left_by_an_interrupted_run():
 def test_does_not_print_credentials_when_debug_is_off():
     output = run_seed_demo()
 
-    assert "BugFixerDemo2026!" not in output
+    assert "QuorfixDemo2026!" not in output
     assert "DeveloperDemo2026!" not in output
 
 
@@ -385,7 +419,7 @@ def test_prints_a_readable_credentials_table_when_debug_is_on():
     with override_settings(DEBUG=True):
         output = run_seed_demo()
 
-    assert "BugFixerDemo2026!" in output
+    assert "QuorfixDemo2026!" in output
     assert "admin@bugfixer.local" in output
     assert "DEVELOPMENT-ONLY" in output.upper()
     assert "http://localhost:3000" in output

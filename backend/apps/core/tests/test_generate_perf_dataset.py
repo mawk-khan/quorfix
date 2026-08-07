@@ -95,7 +95,7 @@ def test_refuses_when_database_name_looks_like_production():
     from django.db import connection
 
     original_name = connection.settings_dict["NAME"]
-    connection.settings_dict["NAME"] = "bugfixer_prod"
+    connection.settings_dict["NAME"] = "quorfix_prod"
     try:
         with pytest.raises(CommandError, match="prod"):
             run(**TINY_KWARGS)
@@ -106,6 +106,17 @@ def test_refuses_when_database_name_looks_like_production():
 
 @pytest.mark.django_db
 def test_refuses_when_demo_organization_present():
+    Organization.objects.create(name="Quorfix Demo", slug="quorfix-demo")
+    with pytest.raises(CommandError, match="demo"):
+        run(**TINY_KWARGS)
+    assert not Organization.objects.filter(slug__startswith=PERF_SLUG_PREFIX).exists()
+
+
+@pytest.mark.django_db
+def test_refuses_when_legacy_pre_rename_demo_organization_present():
+    """PROTECTED_ORG_SLUGS still recognizes the pre-Quorfix-rebrand slug —
+    a local dev database seeded before the rename must stay just as
+    protected as one seeded after it."""
     Organization.objects.create(name="Bug Fixer Demo", slug="bug-fixer-demo")
     with pytest.raises(CommandError, match="demo"):
         run(**TINY_KWARGS)

@@ -1,4 +1,13 @@
 -r requirements.txt
-pytest==8.3.4
+# pytest 9.1.1: resolves PYSEC-2026-1845 (fixed in 9.0.3+) — see
+# docs/ACCESS_AND_TESTING.md Phase 6 Chunk K.
+pytest==9.1.1
+# pytest-django deliberately NOT bumped to its own latest (4.13.0 at the
+# time): that version has a reproducible incompatibility with pytest 9
+# against this project's suite (AttributeError: 'PytestDjangoTestCase' has
+# no attribute '_pre_setup_ran_eagerly', in pytest_django/fixtures.py).
+# 4.9.0 has no known advisory and works correctly with pytest 9.1.1 — the
+# full suite passes (1065 passed, 1 skipped). Revisit this pin next time
+# pytest-django cuts a release and re-run the full suite before bumping it.
 pytest-django==4.9.0
 ruff==0.9.4

@@ -1,13 +1,14 @@
 name: release
 
 # Skeleton only. This workflow has never run — it triggers exclusively on
-# pushing a version tag (vX.Y.Z), and no chunk of work so far has created
-# one (Bug Fixer Community has not cut a release yet). Nothing here runs
-# as a side effect of a normal push, pull request, or any other workflow
-# in this repository. Actual first use of this workflow — including
-# confirming the GHCR namespace/visibility and reviewing this file once
-# more — belongs to the release-documentation phase, not this CI-hardening
-# chunk.
+# pushing a version tag (vX.Y.Z[-prerelease]), and no chunk of work so far
+# has created one (Quorfix Community has not cut a release yet). Nothing
+# here runs as a side effect of a normal push, pull request, or any other
+# workflow in this repository. Actual first use of this workflow —
+# including confirming the GHCR namespace/visibility and reviewing this
+# file once more — belongs to an actual release, not this hardening pass.
+# See docs/RELEASING.md for the full procedure this workflow is one step
+# of.
 
 on:
   push:
@@ -33,16 +34,39 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Validate tag format (vX.Y.Z)
+      - uses: actions/checkout@v4
+
+      - name: Validate tag matches VERSION (vX.Y.Z or vX.Y.Z-prerelease)
         run: |
-          if ! [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Tag '${GITHUB_REF_NAME}' does not match the required vX.Y.Z format" >&2
+          if ! [[ "${GITHUB_REF_NAME}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Tag '${GITHUB_REF_NAME}' does not match the required vX.Y.Z[-prerelease] format" >&2
             exit 1
           fi
-          echo "Tag '${GITHUB_REF_NAME}' is well-formed."
+
+          version_file_content="$(cat VERSION)"
+          expected="v${version_file_content}"
+          if [ "${GITHUB_REF_NAME}" != "$expected" ]; then
+            echo "Tag '${GITHUB_REF_NAME}' does not match VERSION file content ('${version_file_content}')." >&2
+            echo "The pushed tag must equal v\$(cat VERSION) exactly — update VERSION and commit" \
+                 "that change before tagging, or tag the commit that already has the right VERSION." >&2
+            exit 1
+          fi
+          echo "Tag '${GITHUB_REF_NAME}' matches VERSION file content."
+
+  # Full backend/frontend CI must pass for this exact commit before any
+  # image is built or pushed — reuses backend.yml/frontend.yml directly
+  # (via workflow_call) rather than duplicating their steps, so this can
+  # never silently drift out of sync with what push/PR CI actually checks.
+  backend-checks:
+    needs: validate-tag
+    uses: ./.github/workflows/backend.yml
+
+  frontend-checks:
+    needs: validate-tag
+    uses: ./.github/workflows/frontend.yml
 
   build-and-push:
-    needs: validate-tag
+    needs: [validate-tag, backend-checks, frontend-checks]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -64,7 +88,7 @@ jobs:
           docker build \
             --build-arg VERSION="${GITHUB_REF_NAME#v}" \
             --build-arg VCS_REF="${GITHUB_SHA}" \
-            -t "ghcr.io/${{ github.repository_owner }}/bugfixer-backend:${GITHUB_REF_NAME}" \
+            -t "ghcr.io/${{ github.repository_owner }}/quorfix-backend:${GITHUB_REF_NAME}" \
             ./backend
 
       - name: Build frontend production image
@@ -73,20 +97,42 @@ jobs:
             --build-arg VERSION="${GITHUB_REF_NAME#v}" \
             --build-arg VCS_REF="${GITHUB_SHA}" \
             --build-arg BACKEND_INTERNAL_URL=http://backend:8000 \
-            -t "ghcr.io/${{ github.repository_owner }}/bugfixer-frontend:${GITHUB_REF_NAME}" \
+            -t "ghcr.io/${{ github.repository_owner }}/quorfix-frontend:${GITHUB_REF_NAME}" \
             ./frontend
+
+      # Same minimal checks as .github/workflows/images.yml's smoke check
+      # (non-root runtime user, entrypoints actually start) — run again
+      # here against the *exact* images about to be pushed, since
+      # images.yml building its own separate `:ci`-tagged copies earlier in
+      # the commit's history proves nothing about these specific tags.
+      - name: Verify runtime users are non-root
+        run: |
+          backend_uid="$(docker run --rm --entrypoint id "ghcr.io/${{ github.repository_owner }}/quorfix-backend:${GITHUB_REF_NAME}" -u)"
+          echo "backend runtime uid: $backend_uid"
+          test "$backend_uid" -ne 0
+
+          frontend_uid="$(docker run --rm --entrypoint id "ghcr.io/${{ github.repository_owner }}/quorfix-frontend:${GITHUB_REF_NAME}" -u)"
+          echo "frontend runtime uid: $frontend_uid"
+          test "$frontend_uid" -ne 0
+
+      - name: Minimal container smoke check
+        run: |
+          docker run --rm --entrypoint gunicorn "ghcr.io/${{ github.repository_owner }}/quorfix-backend:${GITHUB_REF_NAME}" --version
+          docker run --rm --entrypoint celery "ghcr.io/${{ github.repository_owner }}/quorfix-backend:${GITHUB_REF_NAME}" --version
+          docker run --rm --entrypoint sh "ghcr.io/${{ github.repository_owner }}/quorfix-frontend:${GITHUB_REF_NAME}" -c "test -f server.js && echo 'server.js present'"
+          docker run --rm --entrypoint node "ghcr.io/${{ github.repository_owner }}/quorfix-frontend:${GITHUB_REF_NAME}" --version
 
       - name: Push images
         run: |
-          docker push "ghcr.io/${{ github.repository_owner }}/bugfixer-backend:${GITHUB_REF_NAME}"
-          docker push "ghcr.io/${{ github.repository_owner }}/bugfixer-frontend:${GITHUB_REF_NAME}"
+          docker push "ghcr.io/${{ github.repository_owner }}/quorfix-backend:${GITHUB_REF_NAME}"
+          docker push "ghcr.io/${{ github.repository_owner }}/quorfix-frontend:${GITHUB_REF_NAME}"
 
       - name: Record pushed image digests
         run: |
           {
             echo "### Released images (${GITHUB_REF_NAME})"
             echo
-            for image in bugfixer-backend bugfixer-frontend; do
+            for image in quorfix-backend quorfix-frontend; do
               digest="$(docker inspect "ghcr.io/${{ github.repository_owner }}/${image}:${GITHUB_REF_NAME}" --format '{{.Id}}')"
               echo "- \`ghcr.io/${{ github.repository_owner }}/${image}:${GITHUB_REF_NAME}\` — \`${digest}\`"
             done

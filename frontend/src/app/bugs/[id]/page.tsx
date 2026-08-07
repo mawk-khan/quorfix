@@ -26,6 +26,7 @@ import { listMembers } from "@/lib/api/members";
 import type { Bug, BugStatus } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session-provider";
 import { errorProps } from "@/lib/forms/error-props";
+import { usePageTitle } from "@/lib/use-page-title";
 import { addTagSchema, type AddTagFormValues, updateBugSchema, type UpdateBugFormValues } from "@/lib/validation/bugs";
 
 import { PriorityBadge, SeverityBadge, StatusBadge } from "../bug-badges";
@@ -88,6 +89,7 @@ export default function BugDetailPage() {
   });
 
   const bug = bugQuery.data;
+  usePageTitle(bug ? `${bug.key} · Bugs` : "Bugs");
 
   const {
     register,

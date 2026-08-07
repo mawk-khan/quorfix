@@ -10,6 +10,7 @@ import { ApiError } from "@/lib/api/client";
 import { listProjects } from "@/lib/api/projects";
 import type { ArchivedFilter } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session-provider";
+import { usePageTitle } from "@/lib/use-page-title";
 
 import { PaginationControls } from "./pagination-controls";
 import { ProjectFilters } from "./project-filters";
@@ -32,6 +33,7 @@ function describeError(error: unknown): string {
 }
 
 export default function ProjectsPage() {
+  usePageTitle("Projects");
   return (
     // useSearchParams() opts this page out of static prerendering unless
     // it's wrapped in Suspense — the fallback only ever flashes during the

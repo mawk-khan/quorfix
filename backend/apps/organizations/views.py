@@ -212,10 +212,12 @@ class InvitationViewSet(GenericViewSet):
 
         invite_url = f"{settings.FRONTEND_BASE_URL}/invitations/{raw_token}"
         send_mail(
-            subject=f"You've been invited to {request.organization.name} on Bug Fixer",
+            subject=(
+                f"You've been invited to {request.organization.name} on {settings.PRODUCT_NAME}"
+            ),
             message=(
-                f"You've been invited to join {request.organization.name} on Bug "
-                f"Fixer. Accept your invitation: {invite_url}"
+                f"You've been invited to join {request.organization.name} on "
+                f"{settings.PRODUCT_NAME}. Accept your invitation: {invite_url}"
             ),
             from_email=settings.DEFAULT_FROM_EMAIL,
             recipient_list=[invitation.email],

@@ -16,6 +16,15 @@ seed-demo:
 # local-development docker-compose.yml. None of them run migrations or seed
 # data automatically; `prod-migrate` is the explicit, separate step for that.
 
+# Single source of truth for the product version — see VERSION (root of
+# the repo) and docs/RELEASING.md. Overridable on the command line (e.g.
+# `make prod-build VERSION=1.2.3`) for a CI job that wants to build/tag an
+# image without editing the file; every other consumer (docs, release
+# workflow tag validation, scripts/inspect_version.sh) reads the same file
+# directly so they can never drift from this default.
+VERSION ?= $(shell cat VERSION 2>/dev/null || echo local)
+export VERSION
+
 PROD_COMPOSE = docker compose -f docker-compose.prod.yml --env-file .env
 
 # Validates and prints the fully-resolved production Compose configuration
@@ -43,7 +52,7 @@ prod-down:
 	$(PROD_COMPOSE) down
 
 # Runs Django's system checks (including every apps.core.checks
-# bugfixer.E0xx production check) against the production image and current
+# quorfix.E0xx production check) against the production image and current
 # .env, without starting the long-running services. The backend's own
 # entrypoint already runs this on every container start; this target is for
 # checking configuration before deploying at all.

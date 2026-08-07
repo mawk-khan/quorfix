@@ -1,6 +1,6 @@
 # Observability
 
-How Bug Fixer Community logs, correlates, and reports on its own operational state: log
+How Quorfix Community logs, correlates, and reports on its own operational state: log
 format, request correlation IDs, what Django/Gunicorn/Celery each contribute, which events are
 considered operationally important, the sensitive-data policy those logs are held to, and how
 to collect and read them. No external monitoring vendor is required for any of this — everything
@@ -31,7 +31,7 @@ string field (`exc_info`), and `RequestTextFormatter` collapses its internal new
 Example JSON line (production, fake IDs):
 
 ```json
-{"timestamp": "2026-08-06T19:31:07.449123Z", "level": "INFO", "logger": "apps.core.request", "message": "request completed", "request_id": "46fc95d28b034a72a82d4b7f912afc3b", "task_id": "-", "environment": "production", "service": "bugfixer-backend", "user_id": "-", "organization_id": "-", "http_method": "DELETE", "http_route": "/api/bugs/<uuid:bug_id>/attachments/<uuid:pk>/", "http_status": 200, "duration_ms": 42.7}
+{"timestamp": "2026-08-06T19:31:07.449123Z", "level": "INFO", "logger": "apps.core.request", "message": "request completed", "request_id": "46fc95d28b034a72a82d4b7f912afc3b", "task_id": "-", "environment": "production", "service": "quorfix-backend", "user_id": "-", "organization_id": "-", "http_method": "DELETE", "http_route": "/api/bugs/<uuid:bug_id>/attachments/<uuid:pk>/", "http_status": 200, "duration_ms": 42.7}
 ```
 
 ## Request IDs
@@ -104,7 +104,7 @@ covered next.
 - `correlation_headers()` — called at every dispatch site
   (`apps.notifications.services.notify`, `apps.notifications.tasks.create_notifications_for_event`'s
   own dispatch of `send_notification_email`, `apps.attachments.services.remove_attachment`).
-  Returns `{"bugfixer_correlation_id": get_request_id()}` when a request is in progress, or `{}`
+  Returns `{"quorfix_correlation_id": get_request_id()}` when a request is in progress, or `{}`
   otherwise — dispatched via Celery's `apply_async(headers=...)`, never as a mandatory
   positional/keyword task argument, so no task's call signature changed and no dedup key
   (`apps.notifications.tasks`' `(organization, recipient, dedup_key)` uniqueness) was touched.
@@ -148,7 +148,7 @@ Tasks with correlation wired in: `create_notifications_for_event`, `send_notific
 | Logout | `apps.accounts.views.LogoutView` | INFO |
 | Instance setup completed / rejected | `apps.organizations.views.SetupView` | INFO / WARNING |
 | Invitation accepted / rejected | `apps.organizations.views.InvitationAcceptView` | INFO / WARNING |
-| Production configuration validation failure | `apps.core.checks` (`bugfixer.E0xx`, via `manage.py check`, run by `backend/entrypoint.sh` before the real process starts) | Django system-check `Error` |
+| Production configuration validation failure | `apps.core.checks` (`quorfix.E0xx`, via `manage.py check`, run by `backend/entrypoint.sh` before the real process starts) | Django system-check `Error` |
 
 Deliberately **not** logged at INFO or above: successful health/readiness probes (an
 orchestrator may call these every few seconds — see
@@ -237,7 +237,7 @@ docker compose -f docker-compose.prod.yml logs -f backend celery_worker
   `TestSuccessfulProbesDoNotFloodLogs` in `backend/apps/core/tests/test_health_and_readiness.py`.
   The optional request-completion log (below) specifically logs these two paths at DEBUG instead
   of INFO for the same reason.
-- Startup: `backend/entrypoint.sh` runs `manage.py check` (every `bugfixer.E0xx` production
+- Startup: `backend/entrypoint.sh` runs `manage.py check` (every `quorfix.E0xx` production
   check — see `apps/core/checks.py`) and `manage.py check_attachment_storage` before the real
   process (`gunicorn`/`celery`) starts, so a misconfigured production container fails loudly at
   startup instead of only at first request. Both write through Django's normal
@@ -262,7 +262,7 @@ No external monitoring vendor is required or assumed. If you run one:
   in this document is already structured and queryable without a custom parser.
 - **Correlation**: `request_id` is the join key across a request's application logs, its
   gunicorn access-log line (`rid=` atom), and any Celery task logs it triggered
-  (`bugfixer_correlation_id` header, echoed as that task's own `request_id`/`task_id` fields).
+  (`quorfix_correlation_id` header, echoed as that task's own `request_id`/`task_id` fields).
 - **Uptime/synthetic checks**: `GET /api/health/` (liveness) and `GET /api/health/ready/`
   (readiness) are the two endpoints to point an external checker at; see
   [Health and readiness](#health-and-readiness).

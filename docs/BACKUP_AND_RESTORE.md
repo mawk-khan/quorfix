@@ -1,6 +1,6 @@
 # Backup and Restore
 
-Backup and restore procedures for Bug Fixer Community's production Compose stack
+Backup and restore procedures for Quorfix Community's production Compose stack
 (`docker-compose.prod.yml`): PostgreSQL, local attachment storage, and a full
 Community recovery. Scripts referenced below live in `scripts/`.
 
@@ -28,7 +28,7 @@ Community recovery. Scripts referenced below live in `scripts/`.
 This document covers `docker-compose.prod.yml`'s topology specifically — the
 `db`, `redis`, `backend`, `celery_worker`, and `frontend` services, as
 committed to this repository. It does not cover a different production
-topology; if you operate Bug Fixer some other way (managed PostgreSQL, a
+topology; if you operate Quorfix some other way (managed PostgreSQL, a
 different orchestrator), adapt the underlying commands, not the concepts.
 
 Relevant facts from `docker-compose.prod.yml`, used throughout:
@@ -65,11 +65,11 @@ how they're re-applied after a database restore.
 ## 2. Recovery-set concept
 
 A **recovery set** is one directory produced by `scripts/backup.sh`,
-containing everything needed to restore Bug Fixer Community to a single
+containing everything needed to restore Quorfix Community to a single
 point in time:
 
 ```
-bugfixer-backup-YYYYmmddTHHMMSSZ/
+quorfix-backup-YYYYmmddTHHMMSSZ/
   manifest.txt          # what this recovery set is, and whether it's complete
   database.dump          # pg_dump --format=custom (schema + data + migration records)
   attachments.tar.gz     # tar.gz of the attachments_data volume's contents
@@ -82,6 +82,21 @@ thing, not as four independent files that happen to share a timestamp.
 every step of the backup actually succeeded — see
 [Backup verification](#6-backup-verification).
 
+### Naming compatibility
+
+`quorfix-backup-` is the directory prefix new backups are created with,
+following the Phase 6 Chunk K product rename. It is **only a naming
+convention for new backups** — `restore_db.sh`/`restore_attachments.sh` take
+a direct path to `database.dump`/`attachments.tar.gz` and never inspect or
+require any particular parent-directory name; the only thing they validate
+is `manifest.txt`'s `format_version` field (see [Backup
+verification](#6-backup-verification)). A recovery set created before the
+rename, named `bugfixer-backup-YYYYmmddTHHMMSSZ/`, restores exactly the same
+way — nothing to convert, rename, or migrate. `format_version` (currently
+`1`) is the actual compatibility contract; the directory name has never been
+part of it. See `scripts/tests/test_backup_restore_guards.sh`'s legacy-prefix
+case for the automated proof.
+
 ## 3. Before taking a backup
 
 - Make sure the production stack is up (`db` and `redis` healthy at minimum;
@@ -91,7 +106,7 @@ every step of the backup actually succeeded — see
 - Decide on a backup destination **outside this repository** —
   `scripts/backup.sh` refuses to write inside the repo, and nothing here
   invents a default location. A sensible convention:
-  `/var/backups/bugfixer/` on the host, or a mounted volume dedicated to
+  `/var/backups/quorfix/` on the host, or a mounted volume dedicated to
   backups.
 - Make sure there's enough free disk space at the destination.
   `scripts/backup.sh` prints a soft warning below 500MB free, but the actual
@@ -213,7 +228,7 @@ claimed, since the recovery set may have been copied, moved, or aged since
 then:
 
 ```bash
-cd /path/to/bugfixer-backup-YYYYmmddTHHMMSSZ
+cd /path/to/quorfix-backup-YYYYmmddTHHMMSSZ
 sha256sum -c checksums.sha256
 grep -E '^(status|format_version)=' manifest.txt
 ```
@@ -288,8 +303,8 @@ recovery set as a whole. Run the two scripts back to back from the same
 recovery-set directory:
 
 ```bash
-scripts/restore_db.sh --confirm-restore /path/to/bugfixer-backup-.../database.dump
-scripts/restore_attachments.sh --confirm-restore /path/to/bugfixer-backup-.../attachments.tar.gz
+scripts/restore_db.sh --confirm-restore /path/to/quorfix-backup-.../database.dump
+scripts/restore_attachments.sh --confirm-restore /path/to/quorfix-backup-.../attachments.tar.gz
 ```
 
 (or `make restore-db-confirm IN=...` / `make restore-attachments-confirm

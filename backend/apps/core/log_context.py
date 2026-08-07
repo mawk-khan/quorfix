@@ -62,7 +62,7 @@ class RequestContextFilter(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = get_request_id()
         record.environment = getattr(settings, "ENVIRONMENT", "development")
-        record.service = getattr(settings, "SERVICE_NAME", "bugfixer-backend")
+        record.service = getattr(settings, "SERVICE_NAME", "quorfix-backend")
         record.user_id = get_user_id() or "-"
         record.organization_id = get_organization_id() or "-"
         # current_task is a LocalProxy that resolves to None outside a

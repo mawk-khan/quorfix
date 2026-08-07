@@ -10,6 +10,7 @@ import { AccessState } from "@/components/access-state";
 import { acceptInvitation, getInvitation } from "@/lib/api/invitations";
 import { useSession } from "@/lib/auth/session-provider";
 import { errorProps } from "@/lib/forms/error-props";
+import { usePageTitle } from "@/lib/use-page-title";
 import {
   acceptInvitationSchema,
   type AcceptInvitationFormValues,
@@ -22,6 +23,7 @@ import {
 // just for this page would be an inconsistent one-off for no real benefit,
 // since this page has no SEO value and a brief loading state is fine.
 export default function InvitationAcceptPage() {
+  usePageTitle("Accept invitation");
   const params = useParams<{ token: string }>();
   const token = params.token;
   const router = useRouter();

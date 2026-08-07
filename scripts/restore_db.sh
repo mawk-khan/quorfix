@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/restore_db.sh — destructive PostgreSQL restore for Bug Fixer's
+# scripts/restore_db.sh — destructive PostgreSQL restore for Quorfix's
 # production Compose stack (docker-compose.prod.yml's `db` service).
 #
 # Usage:

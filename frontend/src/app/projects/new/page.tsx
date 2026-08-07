@@ -11,6 +11,7 @@ import { ApiError } from "@/lib/api/client";
 import { listMembers } from "@/lib/api/members";
 import { createProject } from "@/lib/api/projects";
 import { useSession } from "@/lib/auth/session-provider";
+import { usePageTitle } from "@/lib/use-page-title";
 import { createProjectSchema, type CreateProjectFormValues } from "@/lib/validation/projects";
 
 import { ProjectForm } from "../project-form";
@@ -30,6 +31,7 @@ function describeError(error: unknown): string {
 }
 
 export default function NewProjectPage() {
+  usePageTitle("New project");
   const { session, isLoading: sessionLoading } = useSession();
   const isAdmin = session?.role === "administrator";
   const router = useRouter();

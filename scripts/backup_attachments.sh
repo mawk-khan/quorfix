@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/backup_attachments.sh — local-attachments backup for Bug Fixer's
+# scripts/backup_attachments.sh — local-attachments backup for Quorfix's
 # production Compose stack (docker-compose.prod.yml's `attachments_data`
 # named volume, mounted at ATTACHMENTS_LOCAL_ROOT in the `backend` and
 # `celery_worker` services).

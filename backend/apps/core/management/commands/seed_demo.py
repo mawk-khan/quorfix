@@ -28,20 +28,34 @@ from apps.projects.services import create_project, restore_project, update_proje
 
 User = get_user_model()
 
-DEMO_ORG_NAME = "Bug Fixer Demo"
-DEMO_ORG_SLUG = "bug-fixer-demo"
+DEMO_ORG_NAME = "Quorfix Demo"
+DEMO_ORG_SLUG = "quorfix-demo"
+# Recognized (read-only — never used to create anything) so a local dev
+# database seeded before the Quorfix rebrand is reused as-is rather than
+# duplicated: Community allows only one organization, so a second `setup`
+# would otherwise fail outright on re-run against such a database. See
+# docs/ACCESS_AND_TESTING.md Phase 6 Chunk K "Demo credentials" for the full
+# reasoning. Never renamed automatically — an existing "Bug Fixer Demo"
+# organization stays exactly as it is.
+LEGACY_DEMO_ORG_SLUG = "bug-fixer-demo"
 
 # Fixed, well-known, non-production credentials — intentionally hardcoded so
 # every developer gets the exact same demo login. This command refuses to
 # run under production settings (see _is_production_settings below), so
 # these values are never reachable outside a local/dev database.
+#
+# Email domains are deliberately still "@bugfixer.local", not
+# "@quorfix.local" — this is the one piece of demo data this chunk does NOT
+# rebrand. Local-development-only identifier; see docs/ACCESS_AND_TESTING.md
+# Phase 6 Chunk K for why the domain stays put while everything else here
+# (org name/slug, project names, passwords) picks up the new branding.
 PERSONAS = [
     {
         "key": "admin",
         "email": "admin@bugfixer.local",
         "first_name": "Demo",
         "last_name": "Administrator",
-        "password": "BugFixerDemo2026!",
+        "password": "QuorfixDemo2026!",
         "role": CommunityRole.ADMINISTRATOR,
     },
     {
@@ -80,7 +94,7 @@ PERSONAS = [
 
 DEMO_PROJECTS = [
     {
-        "name": "Bug Fixer Web Application",
+        "name": "Quorfix Web Application",
         "key": "BFW",
         "status": ProjectStatus.ACTIVE,
         "lead": "admin",
@@ -466,9 +480,14 @@ class Command(BaseCommand):
     # -- organization -----------------------------------------------------
 
     def _ensure_organization(self) -> Organization:
-        organization = Organization.objects.filter(slug=DEMO_ORG_SLUG).first()
+        # Checks both the current and the pre-rename slug — see
+        # LEGACY_DEMO_ORG_SLUG's own comment. Whichever one already exists
+        # (if either) is reused exactly as-is; never renamed here.
+        organization = Organization.objects.filter(
+            slug__in=(DEMO_ORG_SLUG, LEGACY_DEMO_ORG_SLUG)
+        ).first()
         if organization is not None:
-            self.stdout.write(f"Organization '{DEMO_ORG_SLUG}' already exists — reusing it.")
+            self.stdout.write(f"Organization '{organization.slug}' already exists — reusing it.")
             return organization
 
         admin_persona = next(p for p in PERSONAS if p["key"] == "admin")
@@ -494,7 +513,7 @@ class Command(BaseCommand):
 
         if organization.slug != DEMO_ORG_SLUG:
             # Would only happen if a differently-slugged organization already
-            # collided with "Bug Fixer Demo"'s slugified name — don't
+            # collided with "Quorfix Demo"'s slugified name — don't
             # silently seed data under an unexpected slug.
             raise CommandError(
                 f"Created organization slug {organization.slug!r} does not match the "
