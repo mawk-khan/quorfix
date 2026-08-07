@@ -3,6 +3,5 @@ contact_links:
   - name: Security vulnerability report
     url: https://github.com/mawk-khan/quorfix/blob/master/docs/SECURITY.md
     about: >-
-      Do not report a security vulnerability here. See docs/SECURITY.md for how to report one
-      privately — it is currently a documented release blocker with no monitored contact
-      configured yet, and that document explains the interim process.
+      Do not report a security vulnerability here. Report it privately to
+      security@quorfix.com — see docs/SECURITY.md for what to include.

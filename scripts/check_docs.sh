@@ -14,9 +14,10 @@
 #   5. No leftover pre-rename branding remains outside the explicit
 #      allowlist below (each entry with its own comment explaining why
 #      it's still there).
-#   6. Every "REPLACE-ME" placeholder found is one of the two expected,
-#      already-tracked release blockers (docs/SECURITY.md,
-#      CODE_OF_CONDUCT.md) — not a leftover somewhere else.
+#   6. No "REPLACE-ME" placeholder contact remains anywhere (the security and
+#      Code of Conduct contacts are resolved, real addresses — see below),
+#      and security@quorfix.com / conduct@quorfix.com appear in every file
+#      that must document them.
 #
 # Deliberately does NOT fail on a historical Git commit subject quoted
 # verbatim in documentation (this script never inspects `git log` output at
@@ -184,33 +185,31 @@ if [ -n "$branding_hits" ]; then
 fi
 [ "$unexpected_branding" -eq 1 ] || ok "no unallowlisted pre-rename branding reference remains"
 
-# --- 6. Every REPLACE-ME placeholder is one of the two expected ones -------
+# --- 6. Confirmed contacts present; no REPLACE-ME placeholder remains ------
 
-replace_me_hits="$(git -C "$REPO_ROOT" grep -l 'REPLACE-ME' -- '*.md' 2>/dev/null || true)"
-EXPECTED_PLACEHOLDER_FILES=("docs/SECURITY.md" "CODE_OF_CONDUCT.md" "docs/ACCESS_AND_TESTING.md")
-unexpected_placeholder=0
+replace_me_hits="$(git -C "$REPO_ROOT" grep -l 'REPLACE-ME' -- '*.md' '*.yml' 2>/dev/null || true)"
 if [ -n "$replace_me_hits" ]; then
-  while IFS= read -r f; do
-    [ -z "$f" ] && continue
-    found=0
-    for expected in "${EXPECTED_PLACEHOLDER_FILES[@]}"; do
-      [ "$f" = "$expected" ] && found=1
-    done
-    if [ "$found" -eq 0 ]; then
-      fail "unexpected REPLACE-ME placeholder in: $f"
-      unexpected_placeholder=1
-    fi
-  done <<<"$replace_me_hits"
+  fail "REPLACE-ME placeholder contact remains (should be fully resolved) in:"
+  echo "$replace_me_hits" >&2
+else
+  ok "no REPLACE-ME placeholder contact remains anywhere"
 fi
-[ "$unexpected_placeholder" -eq 1 ] || ok "REPLACE-ME placeholders only appear in the expected, tracked files"
 
-for f in "${EXPECTED_PLACEHOLDER_FILES[@]}"; do
-  if ! grep -q 'REPLACE-ME' "$REPO_ROOT/$f" 2>/dev/null; then
-    echo "INFO: $f no longer contains a REPLACE-ME placeholder — if the contact was genuinely" >&2
-    echo "      configured and verified, update docs/RELEASING.md's checklist accordingly;" >&2
-    echo "      if this was accidental, the release blocker may have been silently dropped." >&2
+SECURITY_CONTACT_FILES=("docs/SECURITY.md" "README.md" ".github/ISSUE_TEMPLATE/config.yml")
+missing_security_contact=0
+for f in "${SECURITY_CONTACT_FILES[@]}"; do
+  if ! grep -q 'security@quorfix\.com' "$REPO_ROOT/$f" 2>/dev/null; then
+    fail "security@quorfix.com missing from: $f"
+    missing_security_contact=1
   fi
 done
+[ "$missing_security_contact" -eq 1 ] || ok "security@quorfix.com present in every required file"
+
+if grep -q 'conduct@quorfix\.com' "$REPO_ROOT/CODE_OF_CONDUCT.md" 2>/dev/null; then
+  ok "conduct@quorfix.com present in CODE_OF_CONDUCT.md"
+else
+  fail "conduct@quorfix.com missing from: CODE_OF_CONDUCT.md"
+fi
 
 echo >&2
 if [ "$FAIL" -eq 0 ]; then

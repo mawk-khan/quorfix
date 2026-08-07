@@ -15,7 +15,7 @@ Nothing yet.
 
 First public beta. Release date is unset until this version is actually tagged and published —
 see `docs/RELEASING.md`'s checklist, which this version will not be tagged against until every
-item on it (including the still-open security-contact blocker below) is resolved.
+item on it is resolved.
 
 ### Added
 
@@ -68,6 +68,9 @@ item on it (including the still-open security-contact blocker below) is resolved
 - **Quorfix branding** — product rename from this project's pre-launch working title to Quorfix
   across user-facing text, documentation, identifiers, and release tooling (see
   `docs/ACCESS_AND_TESTING.md` Phase 6 Chunk K for the full scope and reasoning).
+- **Confirmed contact channels** — `security@quorfix.com` (vulnerability reports, see
+  `docs/SECURITY.md`) and `conduct@quorfix.com` (Code of Conduct enforcement, see
+  `CODE_OF_CONDUCT.md`) are real, monitored addresses.
 
 ### Known beta limitations
 
@@ -93,6 +96,3 @@ item on it (including the still-open security-contact blocker below) is resolved
   pass exist, but no live screen-reader (NVDA/JAWS/VoiceOver/Orca) session has been performed;
   see `docs/ACCESS_AND_TESTING.md`'s accessibility chunk entry for exactly what was and wasn't
   verified.
-- **Unresolved release blocker: no monitored security contact exists yet** — see
-  `docs/SECURITY.md` "Reporting a vulnerability". This version must not be tagged until that is
-  resolved.

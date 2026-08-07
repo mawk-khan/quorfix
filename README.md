@@ -167,9 +167,8 @@ document is the permanent, maintained reference — it is updated after every co
 
 See [docs/SECURITY.md](./docs/SECURITY.md) for the vulnerability reporting process, security
 scope, and deployment assumptions (HTTPS/reverse-proxy responsibility, attachment security
-model, dependency scan policy). **The security contact in that document is a placeholder — this
-is a known, tracked release blocker (see `docs/SECURITY.md` and `CHANGELOG.md`), not something
-resolved yet.**
+model, dependency scan policy). Report suspected vulnerabilities privately to
+`security@quorfix.com` — never through a public GitHub issue.
 
 ## Contributing and support
 
@@ -196,7 +195,6 @@ Summarized here; see [CHANGELOG.md](./CHANGELOG.md) for the full, versioned list
 - TLS termination and a reverse proxy are the operator's responsibility.
 - No Professional features exist in this repository.
 - No formal WCAG conformance certification.
-- **No monitored security contact yet — see [Security](#security).**
 
 ## Licensing
 

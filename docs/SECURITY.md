@@ -6,11 +6,6 @@ deployment model relies on. It is not a promise of response time, and it is not 
 security audit — see [Known beta limitations](#known-beta-limitations) for what this document
 does not claim.
 
-**RELEASE BLOCKER: no monitored security contact exists yet (see [Reporting a
-vulnerability](#reporting-a-vulnerability)).** A tagged public release must not ship until this
-is resolved — see `docs/RELEASING.md`'s pre-release checklist, which treats this as a hard gate,
-not an advisory note.
-
 ## Supported versions
 
 Quorfix Community has not yet cut a tagged release (see `docs/UPGRADING.md`). Until a first
@@ -30,31 +25,22 @@ appropriate for your use case.
 
 ## Reporting a vulnerability
 
-**RELEASE BLOCKER — placeholder contact.** No real, monitored security contact has been
-configured. This repository's own configuration and Git remote metadata were checked
-(Phase 6 Chunk K) specifically looking for an existing one — none was found. The address below
-is a clearly-marked placeholder, not a functioning inbox; nothing in this repository invents or
-assumes a real one:
+Report suspected vulnerabilities privately to:
 
 ```
-security@REPLACE-ME-quorfix.example
+security@quorfix.com
 ```
-
-A sensible real address, once the project owner has actually set it up, would be
-`security@quorfix.com` — but that address must not be published here as if it works until the
-owner confirms the mailbox (or forwarding rule) exists and is actively monitored. Until then:
 
 - **Do not report a suspected vulnerability through a public GitHub issue.** This repository's
   issue templates (`.github/ISSUE_TEMPLATE/`) deliberately do not offer a "security" category for
-  exactly this reason.
-- Report a suspected vulnerability the same way you would reach a maintainer for anything
-  sensitive — directly, privately, outside the public issue tracker — and say explicitly in the
-  first line that it's a security issue.
+  exactly this reason — vulnerability reports must go to the address above, not the public
+  tracker.
+- Email the address directly rather than following a pre-filled link — this document
+  deliberately does not provide a `mailto:` link with a prefilled subject or body, so that no
+  sensitive report content is ever drafted into a client before you've reviewed what it contains.
+- Say explicitly in the first line of your report that it's a security issue.
 - Hold technical/exploit details until you've reached a maintainer directly; see [What not to
   post publicly](#what-not-to-post-publicly).
-
-**This project's release-readiness checklist (`docs/RELEASING.md`) will not be marked complete
-while this section still describes a placeholder.**
 
 **We do not promise a response-time SLA.** This is an unfunded beta project; reports will be
 looked at, not guaranteed a same-day or same-week reply.
@@ -199,8 +185,6 @@ See `docs/BACKUP_AND_RESTORE.md` in full. Summarized:
 
 Documented honestly rather than left implicit:
 
-- **No monitored security contact exists yet — this blocks a public release** (see [Reporting a
-  vulnerability](#reporting-a-vulnerability)). Not merely undocumented; actively unresolved.
 - No independent third-party security audit has been performed.
 - No malware/virus scanning of uploaded attachments (see above).
 - `pip-audit`/`npm audit` findings are tracked and remediated on a best-effort basis (see

@@ -640,18 +640,20 @@ affected by the date range", etc.) — the date filter never silently does nothi
 - **Demo credentials:** `admin@quorfix.local` / `QuorfixDemo2026!` (`seed_demo` reconciles the
   password idempotently on re-run, same as every other persona field). See the credentials table
   below.
-- **Security contact status:** still a placeholder
-  (`security@REPLACE-ME-quorfix.example`) — **release blocker**, see `docs/SECURITY.md`.
-- **Code of Conduct contact status:** still a placeholder
-  (`conduct@REPLACE-ME-quorfix.example`) — **release blocker**, see `CODE_OF_CONDUCT.md`.
+- **Security contact status (as of this chunk):** still a placeholder — **release blocker**, see
+  `docs/SECURITY.md`. Resolved in Phase 6 Chunk L (`security@quorfix.com`, confirmed monitored by
+  the project owner) — see that chunk's entry below.
+- **Code of Conduct contact status (as of this chunk):** still a placeholder — **release
+  blocker**, see `CODE_OF_CONDUCT.md`. Resolved in Phase 6 Chunk L (`conduct@quorfix.com`,
+  confirmed monitored by the project owner) — see that chunk's entry below.
 - **Clean-install guide:** `docs/INSTALLATION.md`.
 - **Release guide:** `docs/RELEASING.md` (procedure only — no release has been executed).
 - **Contribution guide:** `CONTRIBUTING.md`.
 - **Beta limitations:** see `CHANGELOG.md`'s `[0.5.0-beta.1]` entry for the full, versioned list
   (single organization per install, local-only attachment storage, UTC analytics boundaries,
   `OFFSET` deep-page cost, limited concurrent-load testing, no zero-downtime guarantee, reverse
-  proxy/TLS required, no Professional features, no formal WCAG certification, the two
-  unresolved contact blockers above).
+  proxy/TLS required, no Professional features, no formal WCAG certification). The two contact
+  blockers noted above were resolved in Phase 6 Chunk L.
 - **Final local test commands for this chunk:**
   ```sh
   # Backend
@@ -677,6 +679,50 @@ affected by the date range", etc.) — the date filter never silently does nothi
   # Docker (build only — never publishes)
   make ci-images
   ```
+
+### Phase 6 Chunk L: Contact resolution and final release gate
+- **Status:** Complete (contact resolution + gate audit); release itself not executed.
+- **Commit:** _(this change — update once committed)_
+- **Contacts resolved:** `security@quorfix.com` (vulnerability reports, `docs/SECURITY.md`) and
+  `conduct@quorfix.com` (Code of Conduct enforcement, `CODE_OF_CONDUCT.md`) are confirmed,
+  monitored addresses, approved for public use. Every placeholder-contact marker and "release
+  blocker" framing referencing them was removed across `docs/SECURITY.md`, `CODE_OF_CONDUCT.md`,
+  `README.md`, `docs/RELEASING.md`, `docs/ACCESS_AND_TESTING.md` (this file), `CHANGELOG.md`, and
+  `.github/ISSUE_TEMPLATE/config.yml`. `scripts/check_docs.sh`'s check 6 was rewritten from
+  "the placeholder marker is only in the expected files" to "no placeholder marker remains
+  anywhere, and both confirmed addresses are present where required."
+- **Full release-gate audit performed** against candidate `481073c` (plus this chunk's own
+  contact-fix commit on top): backend (ruff/Django checks/migrations/pytest/community-only/
+  OpenAPI/pip-audit ×2) — PASS; frontend (lint/typecheck/build/vitest/npm audit, mention-textarea
+  stability re-verified 10 consecutive isolated runs + full suite ×3) — PASS; branding/version/
+  docs — PASS; production images (uid 1000, correct OCI labels, smoke checks) — PASS; a full
+  23-step clean-install drill via the real `/api/setup/` flow (not `seed_demo`) against
+  `docker-compose.prod.yml` with fresh disposable volumes — PASS; security headers/cookies and
+  tenant-isolation coverage across all 8 required apps — PASS; observability (generated/supplied/
+  invalid request IDs, Celery task/correlation-ID propagation, JSON logs, zero health-check INFO
+  flooding, zero secrets in logs) — PASS; backup/restore drill (destroy + restore, exact
+  attachment checksum, non-standard-directory-name regression) — PASS; performance guards +
+  representative measurement — PASS.
+- **Full Playwright E2E and the axe-core accessibility scan were BLOCKED**, not skipped: this
+  environment's Chromium cannot launch (`libasound.so.2` and other shared libraries are missing
+  from the host, and no passwordless sudo is available to install them), and running the suite
+  via GitHub Actions instead would require pushing the candidate commit first, which was not
+  authorized this session. This is an explicit, tracked release blocker for the next attempt —
+  not a pass.
+- **Upgrade drill substitution:** the requested source commit for the upgrade gate predates
+  `docker-compose.prod.yml`, `backend/Dockerfile`'s production stage, and every backup/restore
+  script entirely — there was no production stack at that point in history to upgrade from. The
+  drill was run instead from the earliest commit that has one (the one that introduced production
+  container configuration), in an isolated git worktree, and passed in full: migration plan/apply,
+  matching backend/worker images, old data and attachment-checksum survival, a real Celery task
+  succeeding post-upgrade, and a rollback-via-backup-restore path that correctly reverted
+  post-upgrade changes.
+- **GitHub synchronization:** `origin` (`github.com/mawk-khan/quorfix`) was 2–3 commits behind
+  local `master` for this entire chunk (nothing was pushed, per instruction) — every GitHub
+  Actions-dependent verification is therefore itself blocked on a push happening first.
+- **Overall verdict:** BLOCKED FOR v0.5.0-beta.1 — solely on the E2E/accessibility gate above.
+  Every other gate in the audit passed. See this chunk's completion report for the full
+  evidence table.
 
 ## Manual test checklist
 

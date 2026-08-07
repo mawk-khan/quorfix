@@ -45,26 +45,19 @@ public spaces.
 
 ## Enforcement
 
-**RELEASE BLOCKER: no monitored enforcement contact exists yet.** The address below is a
-clearly-marked placeholder, not a functioning inbox — do not invent a real one, and do not
-assume `security@quorfix.com` (see `docs/SECURITY.md`) doubles as this contact until the project
-owner explicitly confirms it does:
+Report a Code of Conduct violation privately to:
 
 ```
-conduct@REPLACE-ME-quorfix.example
+conduct@quorfix.com
 ```
 
-Until a real, monitored contact is configured here:
+Report a violation directly and privately to this address, not through a public issue, since the
+report itself may need to describe someone's specific behavior. This is a dedicated enforcement
+contact — it is not the same inbox as `security@quorfix.com` (see `docs/SECURITY.md`), which is
+for vulnerability reports only.
 
-- Report a Code of Conduct violation the same way `docs/SECURITY.md` asks a vulnerability to be
-  reported — directly and privately to a maintainer, not through a public issue, since the
-  report itself may need to describe someone's specific behavior.
-- This project's release-readiness checklist (`docs/RELEASING.md`) will not be marked complete
-  while this section still describes a missing contact.
-
-All complaints will be reviewed and investigated promptly and fairly once a contact exists.
-All maintainers are obligated to respect the privacy and security of the reporter of any
-incident.
+All complaints will be reviewed and investigated promptly and fairly. All maintainers are
+obligated to respect the privacy and security of the reporter of any incident.
 
 ## Enforcement Guidelines
 

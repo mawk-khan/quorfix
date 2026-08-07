@@ -6,8 +6,7 @@ execute any step in this document without the project owner's explicit go-ahead.
 
 ## Pre-release checklist
 
-All of the following must be true before tagging. Treat this as a gate, not a suggestion —
-several items below are documented, tracked release blockers elsewhere in this repository.
+All of the following must be true before tagging. Treat this as a gate, not a suggestion.
 
 1. **Update `VERSION`** (repository root) to the version being released — a plain semantic
    version, optionally with a prerelease suffix (e.g. `0.5.0-beta.1`). No `v` prefix in the file
@@ -33,12 +32,12 @@ several items below are documented, tracked release blockers elsewhere in this r
    validation](#documentation-linkbranding-validation) below) passes — no broken relative links,
    no stray old-repository URLs, no leftover pre-rename branding, no placeholder URL
    presented as real.
-9. **Security contact verified** — `docs/SECURITY.md`'s "Reporting a vulnerability" section must
-   describe a real, monitored contact, not the placeholder. **This is the current release
-   blocker** as of this writing; do not proceed past this step until the project owner confirms
-   the contact is live.
-10. **Code of Conduct contact verified** — same requirement, `CODE_OF_CONDUCT.md`'s
-    "Enforcement" section.
+9. **Security contact verified** — `docs/SECURITY.md`'s "Reporting a vulnerability" section
+   describes `security@quorfix.com` as a real, monitored contact. Confirmed by the project owner;
+   no longer a placeholder.
+10. **Code of Conduct contact verified** — `CODE_OF_CONDUCT.md`'s "Enforcement" section describes
+    `conduct@quorfix.com` as a real, monitored contact. Confirmed by the project owner; no longer
+    a placeholder.
 11. **Production image build**: `make ci-images` (builds both production images fresh, verifies
     non-root runtime users, minimal container smoke check — never pushes).
 12. **Clean-install drill**: follow `docs/INSTALLATION.md`'s "Clean-install smoke test" against
