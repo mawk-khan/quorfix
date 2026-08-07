@@ -615,8 +615,13 @@ affected by the date range", etc.) — the date filter never silently does nothi
   project name is `quorfix` (the local dev stack was brought down and back up under the new
   project name; the pre-rename `postgres_data` volume was left on disk, unused, rather than
   migrated), `seed_demo` looks up only the current `quorfix-demo` organization slug, and
-  `scripts/backup.sh` only documents the `quorfix-backup-` prefix. No Django app, migration, or
-  table was touched, and no routes, roles, or API paths changed. User-facing text (page titles,
+  `scripts/backup.sh` only documents the `quorfix-backup-` prefix. Dropping the pre-rename demo
+  organization slug lookup is a **pre-public-beta branding reset, not a supported migration
+  path**: this project has no external users yet, so an old local checkout with a demo
+  organization seeded under the old slug is not a case `seed_demo` needs to reconcile going
+  forward — reset the local database (`docker compose down -v` and re-migrate) rather than relying
+  on `seed_demo` to find or rename it. No Django app, migration, or table was touched. User-facing
+  text (page titles,
   AppShell, setup/sign-in headings, invitation email subject, OpenAPI title/description, LICENSE
   copyright, system-check IDs `quorfix.E0xx`, `SERVICE_NAME`/Celery app name defaults, browser tab
   titles via a new `usePageTitle` hook — see `frontend/src/lib/use-page-title.ts`) says Quorfix.
