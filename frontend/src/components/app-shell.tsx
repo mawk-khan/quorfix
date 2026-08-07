@@ -1,14 +1,12 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { Sidebar } from "@/components/sidebar";
+import { TopBar } from "@/components/top-bar";
 import { logout } from "@/lib/api/auth";
 import { useSession } from "@/lib/auth/session-provider";
-import { PRODUCT_NAME } from "@/lib/branding";
-
-import { NotificationBell } from "./notification-bell";
 
 // Routes that must never show authenticated chrome, checked by pathname
 // alone (synchronous, no session round-trip) so there is no window in which
@@ -23,6 +21,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { session, refetch } = useSession();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Next's App Router doesn't move focus on client-side navigation the way
   // a full page load moves it to the document — without this, focus stays
@@ -39,6 +38,20 @@ export function AppShell({ children }: { children: ReactNode }) {
     previousPathname.current = pathname;
     document.getElementById("main-content")?.focus();
   }, [pathname]);
+
+  // Closes the mobile drawer on every navigation — otherwise a link tap
+  // would leave the overlay open on top of the new page. Adjusted during
+  // render (React's documented "reset state when a prop changes" pattern —
+  // state, not a ref, since refs may not be read/written during render),
+  // not in an effect: an effect here would have no external system to
+  // synchronize with, just a derived reset, and would cost an extra
+  // post-commit render pass for something render-time adjustment already
+  // handles in one pass.
+  const [prevPathnameForNav, setPrevPathnameForNav] = useState(pathname);
+  if (prevPathnameForNav !== pathname) {
+    setPrevPathnameForNav(pathname);
+    if (mobileNavOpen) setMobileNavOpen(false);
+  }
 
   const handleSignOut = async () => {
     await logout();
@@ -57,63 +70,40 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <>{children}</>;
   }
 
-  const navLinks = [
-    { href: "/bugs", label: "Bugs" },
-    { href: "/projects", label: "Projects" },
-    { href: "/team", label: "Team" },
-    { href: "/notifications", label: "Notifications" },
-  ];
-
   return (
-    <div className="flex min-h-screen flex-col">
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-black focus:shadow-lg focus:outline focus:outline-2 focus:outline-blue-600"
-      >
-        Skip to main content
-      </a>
-      <header className="border-b">
-        <nav
-          aria-label="Primary"
-          className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-x-6 gap-y-2 px-4 py-3 sm:px-8"
+    <div className="flex min-h-screen">
+      {/* A <nav> landmark, not a bare <a> — a skip link floating directly in
+          the body lands outside every landmark, which axe's "region" rule
+          (correctly) flags: a landmark-navigation user has no way to jump
+          straight to it. Wrapping it in its own labeled nav is the
+          standard fix and costs nothing else — the link's own behavior
+          (focus-visible only, jumps to #main-content) is unchanged. */}
+      <nav aria-label="Skip links">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-field focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-text-primary focus:shadow-lg focus:outline focus:outline-2 focus:outline-primary"
         >
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-            <Link href="/" className="font-semibold">
-              {PRODUCT_NAME}
-            </Link>
-            <ul className="flex flex-wrap items-center gap-4 text-sm">
-              {navLinks.map((link) => {
-                const isCurrent = pathname === link.href || pathname.startsWith(`${link.href}/`);
-                return (
-                  <li key={link.href}>
-                    <Link
-                      href={link.href}
-                      aria-current={isCurrent ? "page" : undefined}
-                      className={isCurrent ? "font-semibold underline" : undefined}
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-          <div className="flex items-center gap-4">
-            {session?.user && session.organization && (
-              <p className="hidden text-sm text-gray-500 sm:block">
-                Signed in as {session.user.email} ({session.role}) — {session.organization.name}
-              </p>
-            )}
-            <NotificationBell />
-            <button type="button" onClick={handleSignOut} className="text-sm underline">
-              Sign out
-            </button>
-          </div>
-        </nav>
-      </header>
-      {/* Not <main> — every page already renders its own <main> landmark;
-          nesting a second one here would be an invalid duplicate landmark. */}
-      <div className="flex-1">{children}</div>
+          Skip to main content
+        </a>
+      </nav>
+
+      <Sidebar
+        pathname={pathname}
+        session={session}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
+      />
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        <TopBar
+          session={session}
+          onOpenMobileNav={() => setMobileNavOpen(true)}
+          onSignOut={handleSignOut}
+        />
+        {/* Not <main> — every page already renders its own <main> landmark;
+            nesting a second one here would be an invalid duplicate landmark. */}
+        <div className="min-w-0 flex-1 bg-page">{children}</div>
+      </div>
     </div>
   );
 }

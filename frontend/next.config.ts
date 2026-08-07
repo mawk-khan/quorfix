@@ -34,9 +34,11 @@ const allowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(",").filte
 //     a default reached without checking the alternative.
 //   - No unsafe-eval anywhere: production Turbopack output does not use
 //     eval() (that's a dev-server-only source-map mechanism).
-//   - No data: URIs and no external fonts/CDNs anywhere in this app (no
-//     next/image, no next/font, no third-party script/style tags) — so
-//     img-src/font-src need nothing beyond 'self'.
+//   - No data: URIs and no external font/script/style CDNs anywhere in this
+//     app — next/font (Inter, see app/layout.tsx) self-hosts the font files
+//     at build time and serves them from this app's own origin, never a
+//     runtime request to fonts.googleapis.com, so img-src/font-src need
+//     nothing beyond 'self'.
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline'",

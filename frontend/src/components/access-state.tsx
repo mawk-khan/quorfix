@@ -16,10 +16,10 @@ export interface AccessStateProps {
 export function AccessState({ heading, message, action }: AccessStateProps) {
   return (
     <div>
-      <h1 className="text-lg font-semibold">{heading}</h1>
-      <p className="mt-1 text-sm text-gray-600">{message}</p>
+      <h1 className="text-lg font-semibold text-text-primary">{heading}</h1>
+      <p className="mt-1 text-sm text-text-secondary">{message}</p>
       {action && (
-        <Link href={action.href} className="mt-3 inline-block text-sm text-blue-700 underline">
+        <Link href={action.href} className="mt-3 inline-block text-sm font-medium text-primary underline">
           {action.label}
         </Link>
       )}

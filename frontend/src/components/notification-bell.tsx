@@ -1,10 +1,12 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Bell } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   getUnreadCount,
   listNotifications,
@@ -108,13 +110,13 @@ export function NotificationBell() {
         aria-controls={open ? panelId : undefined}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
         onClick={() => setOpen((value) => !value)}
-        className="relative rounded border px-3 py-1.5 text-sm"
+        className="relative flex size-10 items-center justify-center rounded-field text-text-secondary hover:bg-page hover:text-text-primary"
       >
-        Notifications
+        <Bell aria-hidden="true" className="size-5" />
         {unreadCount > 0 && (
           <span
             aria-hidden="true"
-            className="ml-1 rounded-full bg-red-700 px-1.5 py-0.5 text-xs font-semibold text-white"
+            className="absolute right-1.5 top-1.5 flex min-w-[16px] items-center justify-center rounded-full bg-danger px-1 py-px text-[10px] font-semibold leading-none text-white"
           >
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
@@ -126,63 +128,70 @@ export function NotificationBell() {
           id={panelId}
           role="region"
           aria-label="Recent notifications"
-          className="absolute right-0 z-10 mt-2 w-80 rounded border bg-white shadow-lg"
+          // Below sm: the bell isn't the top bar's rightmost element ("Sign
+          // out" sits further right), so a fixed-width dropdown anchored to
+          // its own right-0 can run past the viewport's left edge on narrow
+          // screens — pinned to the viewport as a near-full-width sheet
+          // instead. At sm and up there's enough room for the normal
+          // anchored dropdown.
+          className="fixed inset-x-4 top-16 z-10 rounded-card border border-border bg-surface shadow-md sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80"
         >
-          <div className="flex items-center justify-between border-b px-3 py-2">
-            <span className="text-sm font-medium">Notifications</span>
+          <div className="flex items-center justify-between border-b border-border px-4 py-3">
+            <span className="text-sm font-semibold text-text-primary">Notifications</span>
             <button
               type="button"
               onClick={() => markAllMutation.mutate()}
               disabled={markAllMutation.isPending || unreadCount === 0}
-              className="text-xs text-blue-700 underline disabled:opacity-50 disabled:no-underline"
+              className="text-xs font-medium text-primary underline disabled:opacity-50 disabled:no-underline"
             >
               Mark all read
             </button>
           </div>
 
-          {dropdownQuery.isLoading && <p className="p-3 text-sm text-gray-500">Loading…</p>}
+          {dropdownQuery.isLoading && <p className="p-4 text-sm text-text-secondary">Loading…</p>}
 
           {dropdownQuery.isError && (
-            <p role="alert" className="p-3 text-sm text-red-700">
+            <p role="alert" className="p-4 text-sm text-danger">
               Could not load notifications.
             </p>
           )}
 
           {dropdownQuery.data && dropdownQuery.data.results.length === 0 && (
-            <p className="p-3 text-sm text-gray-500">No notifications yet.</p>
+            <EmptyState icon={Bell} title="No notifications yet" />
           )}
 
           {dropdownQuery.data && dropdownQuery.data.results.length > 0 && (
-            <ul className="max-h-96 overflow-y-auto">
+            <ul className="max-h-96 divide-y divide-border overflow-y-auto">
               {dropdownQuery.data.results.map((notification) => (
-                <li key={notification.id} className="border-b last:border-b-0">
+                <li key={notification.id}>
                   <button
                     type="button"
                     onClick={() => handleNotificationClick(notification)}
-                    className={`block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 ${
-                      notification.read_at ? "" : "font-semibold"
+                    className={`block w-full px-4 py-2.5 text-left text-sm hover:bg-page ${
+                      notification.read_at ? "" : "bg-primary-subtle/40 font-semibold"
                     }`}
                   >
-                    <span className="block">
+                    <span className="block text-text-primary">
                       {!notification.read_at && (
-                        <span
-                          aria-hidden="true"
-                          className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-700"
-                        />
+                        <span aria-hidden="true" className="mr-1.5 inline-block size-1.5 rounded-full bg-primary" />
                       )}
                       {notificationActorLabel(notification.actor)}{" "}
                       {NOTIFICATION_EVENT_LABELS[notification.event_type]}
                       {!notification.read_at && <span className="sr-only"> (unread)</span>}
                     </span>
-                    <span className="block text-xs text-gray-500">{notification.bug.key}</span>
+                    <span className="block text-xs font-normal text-text-secondary">{notification.bug.key}</span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
 
-          <div className="border-t px-3 py-2 text-center">
-            <Link href="/notifications" className="text-sm text-blue-700 underline" onClick={() => setOpen(false)}>
+          <div className="border-t border-border px-4 py-2.5 text-center">
+            <Link
+              href="/notifications"
+              className="text-sm font-medium text-primary underline"
+              onClick={() => setOpen(false)}
+            >
               View all
             </Link>
           </div>

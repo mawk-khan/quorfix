@@ -2,6 +2,8 @@
 
 import { useEffect, useId, useRef } from "react";
 
+import { buttonVariants } from "@/components/ui/button";
+
 export interface AlertDialogProps {
   // The dialog's accessible name (aria-labelledby target). Visually hidden
   // for the "boxed" variant, where the description text already carries the
@@ -118,8 +120,8 @@ export function AlertDialog({
 
   const containerClassName =
     variant === "boxed"
-      ? "mt-2 space-y-2 rounded border border-red-300 bg-red-50 p-2 text-xs"
-      : "flex items-center gap-3 text-sm";
+      ? "mt-2 space-y-2 rounded-field border border-danger/30 bg-danger-subtle p-3 text-xs text-text-primary"
+      : "flex flex-wrap items-center gap-3 text-sm";
 
   return (
     <div
@@ -136,7 +138,9 @@ export function AlertDialog({
       {variant === "boxed" ? (
         <p id={descriptionId}>{description}</p>
       ) : (
-        <span id={descriptionId}>{description}</span>
+        <span id={descriptionId} className="text-text-secondary">
+          {description}
+        </span>
       )}
       <div className="flex items-center gap-2">
         <button
@@ -144,7 +148,7 @@ export function AlertDialog({
           type="button"
           onClick={onCancel}
           disabled={pending}
-          className={variant === "boxed" ? "underline disabled:opacity-50" : "underline disabled:opacity-50"}
+          className={buttonVariants("secondary", "sm", "disabled:opacity-50")}
         >
           {cancelLabel}
         </button>
@@ -152,7 +156,7 @@ export function AlertDialog({
           type="button"
           onClick={onConfirm}
           disabled={pending}
-          className="text-red-700 underline disabled:opacity-50"
+          className={buttonVariants("danger", "sm", "disabled:opacity-50")}
         >
           {confirmLabel}
         </button>
