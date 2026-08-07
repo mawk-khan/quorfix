@@ -9,8 +9,8 @@ from django.core.management.base import CommandError
 
 
 def _generate_tiny_dataset():
-    previous = os.environ.get("BUGFIXER_DISPOSABLE_DATABASE")
-    os.environ["BUGFIXER_DISPOSABLE_DATABASE"] = "true"
+    previous = os.environ.get("QUORFIX_DISPOSABLE_DATABASE")
+    os.environ["QUORFIX_DISPOSABLE_DATABASE"] = "true"
     try:
         call_command(
             "generate_perf_dataset",
@@ -32,9 +32,9 @@ def _generate_tiny_dataset():
         )
     finally:
         if previous is None:
-            os.environ.pop("BUGFIXER_DISPOSABLE_DATABASE", None)
+            os.environ.pop("QUORFIX_DISPOSABLE_DATABASE", None)
         else:
-            os.environ["BUGFIXER_DISPOSABLE_DATABASE"] = previous
+            os.environ["QUORFIX_DISPOSABLE_DATABASE"] = previous
 
 
 @pytest.mark.django_db

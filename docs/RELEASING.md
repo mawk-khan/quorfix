@@ -31,7 +31,7 @@ several items below are documented, tracked release blockers elsewhere in this r
    proceeding.
 8. **Documentation review**: `scripts/check_docs.sh` (see [Documentation link/branding
    validation](#documentation-linkbranding-validation) below) passes — no broken relative links,
-   no stray old-repository URLs, no unintended leftover "Bug Fixer" branding, no placeholder URL
+   no stray old-repository URLs, no leftover pre-rename branding, no placeholder URL
    presented as real.
 9. **Security contact verified** — `docs/SECURITY.md`'s "Reporting a vulnerability" section must
    describe a real, monitored contact, not the placeholder. **This is the current release
@@ -123,6 +123,5 @@ hand, link/quote it. Include:
 
 `scripts/check_docs.sh` (see that script's own header) checks every relative Markdown link
 resolves, that GitHub links point at `mawk-khan/quorfix`, that domain references point at
-`quorfix.com`, and that no unintended "Bug Fixer" branding or placeholder URL remains outside
-its own allowlist of intentionally-retained compatibility identifiers. Run it as part of step 8
-above; it's read-only and safe to run anytime.
+`quorfix.com`, and that no leftover pre-rename branding or placeholder URL remains. Run it
+as part of step 8 above; it's read-only and safe to run anytime.

@@ -19,13 +19,10 @@
 #     attachments.tar.gz
 #     checksums.sha256
 #
-# Naming compatibility: this is only the prefix new backups are created
-# with — restore_db.sh/restore_attachments.sh take a direct path to
-# database.dump/attachments.tar.gz and never inspect or require any
-# particular parent-directory name (only manifest.txt's format_version is
-# validated). A pre-rename "bugfixer-backup-..." recovery set restores
-# exactly the same way; see docs/BACKUP_AND_RESTORE.md "Naming
-# compatibility".
+# This is only a naming convention — restore_db.sh/restore_attachments.sh
+# take a direct path to database.dump/attachments.tar.gz and never inspect
+# or require any particular parent-directory name (only manifest.txt's
+# format_version is validated).
 #
 # <destination-parent-dir> is caller-supplied and must already exist —
 # this script never writes into the repository and never invents a

@@ -47,8 +47,8 @@ item on it (including the still-open security-contact blocker below) is resolved
   processes, health (`/api/health/`) and readiness (`/api/health/ready/`) endpoints, OCI image
   labels (title/description/source/version/revision).
 - **Backup and restore** — coordinated PostgreSQL + local-attachment recovery sets, checksum
-  verification, versioned manifest format, `quorfix-backup-` naming (accepting pre-rename
-  `bugfixer-backup-` recovery sets identically — see `docs/BACKUP_AND_RESTORE.md`).
+  verification, versioned manifest format, `quorfix-backup-` naming (see
+  `docs/BACKUP_AND_RESTORE.md`).
 - **Upgrade tooling** — migration-drift/unapplied-migration checks, non-destructive post-upgrade
   smoke check, documented rollback procedure.
 - **Security hardening** — dependency scanning (`pip-audit`/`npm audit`) in CI, production
@@ -65,11 +65,9 @@ item on it (including the still-open security-contact blocker below) is resolved
 - **Observability** — structured JSON logging in production, request-correlation IDs threaded
   through HTTP requests and the Celery tasks they dispatch, safe authentication/operational
   event logging, documented sensitive-data policy (see `docs/OBSERVABILITY.md`).
-- **Quorfix branding** — product rename from the working title "Bug Fixer" to Quorfix across
-  user-facing text, documentation, and release tooling, with compatibility retained for
-  established environment variables, database/migration identifiers, and existing local
-  development state (see `docs/ACCESS_AND_TESTING.md` Phase 6 Chunk K for the full scope and
-  reasoning).
+- **Quorfix branding** — product rename from this project's pre-launch working title to Quorfix
+  across user-facing text, documentation, identifiers, and release tooling (see
+  `docs/ACCESS_AND_TESTING.md` Phase 6 Chunk K for the full scope and reasoning).
 
 ### Known beta limitations
 

@@ -18,11 +18,11 @@ from apps.organizations.services import create_invitation
 from apps.projects.models import Project, ProjectStatus
 
 DEMO_EMAILS = {
-    "admin@bugfixer.local",
-    "developer@bugfixer.local",
-    "qa@bugfixer.local",
-    "reporter@bugfixer.local",
-    "viewer@bugfixer.local",
+    "admin@quorfix.local",
+    "developer@quorfix.local",
+    "qa@quorfix.local",
+    "reporter@quorfix.local",
+    "viewer@quorfix.local",
 }
 
 
@@ -69,18 +69,18 @@ def test_creates_organization_members_and_projects():
         )
     }
     assert set(memberships) == DEMO_EMAILS
-    assert memberships["admin@bugfixer.local"].role == CommunityRole.ADMINISTRATOR
-    assert memberships["developer@bugfixer.local"].role == CommunityRole.DEVELOPER
-    assert memberships["qa@bugfixer.local"].role == CommunityRole.QA
-    assert memberships["reporter@bugfixer.local"].role == CommunityRole.REPORTER
-    assert memberships["viewer@bugfixer.local"].role == CommunityRole.VIEWER
+    assert memberships["admin@quorfix.local"].role == CommunityRole.ADMINISTRATOR
+    assert memberships["developer@quorfix.local"].role == CommunityRole.DEVELOPER
+    assert memberships["qa@quorfix.local"].role == CommunityRole.QA
+    assert memberships["reporter@quorfix.local"].role == CommunityRole.REPORTER
+    assert memberships["viewer@quorfix.local"].role == CommunityRole.VIEWER
 
-    admin_user = memberships["admin@bugfixer.local"].user
+    admin_user = memberships["admin@quorfix.local"].user
     assert admin_user.first_name == "Demo"
     assert admin_user.last_name == "Administrator"
     assert admin_user.check_password("QuorfixDemo2026!")
 
-    developer_user = memberships["developer@bugfixer.local"].user
+    developer_user = memberships["developer@quorfix.local"].user
     assert developer_user.check_password("DeveloperDemo2026!")
 
     projects = {p.key: p for p in Project.objects.filter(organization=organization)}
@@ -97,41 +97,7 @@ def test_creates_organization_members_and_projects():
 
     assert projects["API"].name == "Legacy API"
     assert projects["API"].status == ProjectStatus.ON_HOLD
-    assert projects["API"].lead_id == memberships["qa@bugfixer.local"].user.pk
-
-
-@pytest.mark.django_db
-def test_reuses_a_pre_rename_legacy_organization_without_renaming_or_duplicating_it():
-    """A local dev database seeded before the Quorfix rebrand has an
-    organization at the old "bug-fixer-demo" slug. Re-running seed_demo
-    against it must find and reuse that exact organization — never create a
-    second "quorfix-demo" one (Community allows only one organization, so
-    that would just fail outright) and never rename the existing one out
-    from under whatever the operator already has bookmarked/configured."""
-    from apps.organizations.services import setup_instance
-
-    admin_persona_email = "admin@bugfixer.local"
-    user, legacy_organization, _membership = setup_instance(
-        organization_name="Bug Fixer Demo",
-        email=admin_persona_email,
-        password="whatever-was-seeded-before",
-        first_name="Demo",
-        last_name="Administrator",
-    )
-    assert legacy_organization.slug == "bug-fixer-demo"
-
-    run_seed_demo()
-
-    assert Organization.objects.count() == 1
-    reused = Organization.objects.get()
-    assert reused.pk == legacy_organization.pk
-    assert reused.slug == "bug-fixer-demo"  # not renamed to "quorfix-demo"
-    assert reused.name == "Bug Fixer Demo"  # not renamed either
-
-    # The rest of seed_demo's convergence still ran normally against the
-    # reused (legacy-slugged) organization — members/projects/bugs exist.
-    assert OrganizationMembership.objects.filter(organization=reused).count() == 5
-    assert Project.objects.filter(organization=reused).count() == 3
+    assert projects["API"].lead_id == memberships["qa@quorfix.local"].user.pk
 
 
 @pytest.mark.django_db
@@ -300,7 +266,7 @@ def test_reconverges_data_that_drifted_between_runs():
 
     organization = Organization.objects.get(slug="quorfix-demo")
     dev_membership = OrganizationMembership.objects.select_related("user").get(
-        organization=organization, user__email="developer@bugfixer.local"
+        organization=organization, user__email="developer@quorfix.local"
     )
     dev_membership.role = CommunityRole.VIEWER
     dev_membership.save(update_fields=["role"])
@@ -347,11 +313,11 @@ def test_recovers_from_a_stale_pending_invitation_left_by_an_interrupted_run():
 
     organization = Organization.objects.get(slug="quorfix-demo")
     reporter_membership = OrganizationMembership.objects.select_related("user").get(
-        organization=organization, user__email="reporter@bugfixer.local"
+        organization=organization, user__email="reporter@quorfix.local"
     )
     admin_user = (
         OrganizationMembership.objects.select_related("user")
-        .get(organization=organization, user__email="admin@bugfixer.local")
+        .get(organization=organization, user__email="admin@quorfix.local")
         .user
     )
 
@@ -362,17 +328,17 @@ def test_recovers_from_a_stale_pending_invitation_left_by_an_interrupted_run():
     # left behind, which this clears first so it doesn't confound the count
     # assertions below.
     reporter_membership.delete()
-    Invitation.objects.filter(organization=organization, email="reporter@bugfixer.local").delete()
+    Invitation.objects.filter(organization=organization, email="reporter@quorfix.local").delete()
     create_invitation(
         organization=organization,
         invited_by=admin_user,
-        email="reporter@bugfixer.local",
+        email="reporter@quorfix.local",
         role=CommunityRole.REPORTER,
     )
     assert (
         Invitation.objects.filter(
             organization=organization,
-            email="reporter@bugfixer.local",
+            email="reporter@quorfix.local",
             accepted_at__isnull=True,
             revoked_at__isnull=True,
         ).count()
@@ -382,7 +348,7 @@ def test_recovers_from_a_stale_pending_invitation_left_by_an_interrupted_run():
     run_seed_demo()
 
     membership = OrganizationMembership.objects.select_related("user").get(
-        organization=organization, user__email="reporter@bugfixer.local"
+        organization=organization, user__email="reporter@quorfix.local"
     )
     assert membership.role == CommunityRole.REPORTER
     assert membership.user.check_password("ReporterDemo2026!")
@@ -390,7 +356,7 @@ def test_recovers_from_a_stale_pending_invitation_left_by_an_interrupted_run():
     # The stale invitation was revoked and exactly one fresh one accepted in
     # its place — not left pending forever, not duplicated further.
     invitations = Invitation.objects.filter(
-        organization=organization, email="reporter@bugfixer.local"
+        organization=organization, email="reporter@quorfix.local"
     )
     assert invitations.count() == 2
     assert invitations.filter(revoked_at__isnull=False).count() == 1
@@ -399,9 +365,7 @@ def test_recovers_from_a_stale_pending_invitation_left_by_an_interrupted_run():
     # A further run must not touch invitations again for this email.
     run_seed_demo()
     assert (
-        Invitation.objects.filter(
-            organization=organization, email="reporter@bugfixer.local"
-        ).count()
+        Invitation.objects.filter(organization=organization, email="reporter@quorfix.local").count()
         == 2
     )
 
@@ -420,6 +384,6 @@ def test_prints_a_readable_credentials_table_when_debug_is_on():
         output = run_seed_demo()
 
     assert "QuorfixDemo2026!" in output
-    assert "admin@bugfixer.local" in output
+    assert "admin@quorfix.local" in output
     assert "DEVELOPMENT-ONLY" in output.upper()
     assert "http://localhost:3000" in output

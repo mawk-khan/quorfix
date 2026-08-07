@@ -187,7 +187,7 @@ community-check:
 
 # --- Performance testing (docs/PERFORMANCE.md) -----------------------------
 #
-# generate_perf_dataset refuses to run at all without BUGFIXER_DISPOSABLE_DATABASE=true
+# generate_perf_dataset refuses to run at all without QUORFIX_DISPOSABLE_DATABASE=true
 # — set only for the single command below, never in .env — plus its own further
 # checks (production settings, database name, demo/E2E organizations present).
 # Point the running stack at a database you are prepared to lose entirely
@@ -197,7 +197,7 @@ community-check:
 
 # Small, safe default dataset: 1 organization, ~1,000 bugs.
 perf-seed-small:
-	docker compose exec -e BUGFIXER_DISPOSABLE_DATABASE=true backend \
+	docker compose exec -e QUORFIX_DISPOSABLE_DATABASE=true backend \
 		python manage.py generate_perf_dataset
 
 # Runs every measurement scenario (read-only) against the most recently
@@ -209,13 +209,13 @@ perf-measure:
 # Deletes every perf-owned organization (slug prefix "perf-") and nothing
 # else — see docs/PERFORMANCE.md "Ownership marker".
 perf-clean-confirm:
-	docker compose exec -e BUGFIXER_DISPOSABLE_DATABASE=true backend \
+	docker compose exec -e QUORFIX_DISPOSABLE_DATABASE=true backend \
 		python manage.py generate_perf_dataset --cleanup-existing-perf-data --confirm-disposable-database
 
 # Full ~100,000-bug dataset (5 organizations, ~2-3 minutes). Requires BOTH
 # --full and --confirm-disposable-database on top of
-# BUGFIXER_DISPOSABLE_DATABASE=true — never run this against anything but a
+# QUORFIX_DISPOSABLE_DATABASE=true — never run this against anything but a
 # disposable database.
 perf-seed-full-confirm:
-	docker compose exec -e BUGFIXER_DISPOSABLE_DATABASE=true backend \
+	docker compose exec -e QUORFIX_DISPOSABLE_DATABASE=true backend \
 		python manage.py generate_perf_dataset --full --confirm-disposable-database

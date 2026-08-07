@@ -1,11 +1,4 @@
-# Deliberately left as "bug-fixer" (the pre-rename Compose project name),
-# not "quorfix" — changing this would make Compose treat every existing
-# local checkout's already-running containers and postgres_data volume as
-# belonging to a *different* project, orphaning real local data on the next
-# `docker compose up` instead of reusing it. See docs/ACCESS_AND_TESTING.md
-# Phase 6 Chunk K for the full reasoning; docker-compose.prod.yml (never yet
-# deployed anywhere) does not have this constraint.
-name: bug-fixer
+name: quorfix
 
 services:
   db:

@@ -8,15 +8,12 @@
 #      real file on disk.
 #   2. Every github.com link points at github.com/mawk-khan/quorfix, unless
 #      explicitly allowlisted below (with a reason).
-#   3. No stray "bugfixer.example"/"bugfixer.com"-shaped domain remains
-#      (the one intentionally-retained domain, "bugfixer.local" demo
-#      emails, is allowlisted below).
+#   3. No stray "bugfixer.example"/"bugfixer.com"-shaped domain remains.
 #   4. No pre-rename placeholder repository URL (bitbucket-claude/aivah)
 #      remains anywhere.
-#   5. No unintended old "Bug Fixer" branding remains outside the explicit
-#      allowlist (established environment variables, legacy demo/backup
-#      identifiers kept for compatibility — each with its own comment
-#      explaining why it's still there).
+#   5. No leftover pre-rename branding remains outside the explicit
+#      allowlist below (each entry with its own comment explaining why
+#      it's still there).
 #   6. Every "REPLACE-ME" placeholder found is one of the two expected,
 #      already-tracked release blockers (docs/SECURITY.md,
 #      CODE_OF_CONDUCT.md) — not a leftover somewhere else.
@@ -110,6 +107,7 @@ PYEOF
 # legitimate third-party reference, not a leftover placeholder.
 ALLOWED_GITHUB_PREFIXES=(
   "github.com/mawk-khan/quorfix"      # this repository — the only "our own" one
+  "github.com/mozilla/diversity"      # CODE_OF_CONDUCT.md's Contributor Covenant attribution link
   "github.com/sponsors/"              # npm package funding links (package-lock.json)
   "github.com/Masterminds/semver"     # .ddev/config.yaml's own boilerplate comment
   "github.com/chalk/"                 # npm package funding links
@@ -138,8 +136,6 @@ fi
 [ "$FAIL" -eq 1 ] || ok "every github.com reference points at mawk-khan/quorfix or an allowlisted third party"
 
 # --- 3. No stray bugfixer.example/bugfixer.com domain -----------------------
-# bugfixer.local (demo emails) is the one intentionally-retained domain —
-# see seed_demo.py's own comment for why.
 
 stray_domain="$(git -C "$REPO_ROOT" grep -noE 'bugfixer\.(example|com|dev|io|net|org)' -- '*.md' '*.yml' 2>/dev/null || true)"
 if [ -n "$stray_domain" ]; then
@@ -159,26 +155,12 @@ else
   ok "no pre-rename placeholder repository URL remains"
 fi
 
-# --- 5. No unintended old "Bug Fixer" branding ------------------------------
+# --- 5. No leftover pre-rename branding --------------------------------------
 # Every file below is allowlisted with a reason — a NEW file matching the
 # pattern that isn't in this list is what this check is meant to catch.
 
 ALLOWED_BRANDING_FILES=(
-  ".gitignore"                                                     # legacy backup-prefix gitignore pattern, kept for compatibility
-  "Makefile"                                                       # BUGFIXER_DISPOSABLE_DATABASE — established env var, kept per CLAUDE.md Chunk K policy
-  "backend/apps/core/management/commands/generate_perf_dataset.py" # BUGFIXER_DISPOSABLE_DATABASE + legacy demo slug guard
-  "backend/apps/core/management/commands/measure_performance.py"   # BUGFIXER_DISPOSABLE_DATABASE reference
-  "backend/apps/core/management/commands/seed_demo.py"             # LEGACY_DEMO_ORG_SLUG + bugfixer.local demo emails, both intentional
-  "backend/apps/core/tests/test_generate_perf_dataset.py"          # tests the legacy-slug guard above
-  "backend/apps/core/tests/test_measure_performance.py"            # BUGFIXER_DISPOSABLE_DATABASE reference
-  "backend/apps/core/tests/test_seed_demo.py"                      # tests bugfixer.local emails + legacy-org reuse
-  "docker-compose.yml"                                             # Compose project name deliberately unrenamed (live local dev data)
-  "docs/ACCESS_AND_TESTING.md"                                     # documents legacy demo email + historical Chunk G entry
-  "docs/BACKUP_AND_RESTORE.md"                                     # documents legacy backup-prefix compatibility
-  "docs/PERFORMANCE.md"                                            # references docker-compose.yml's own unrenamed network name
-  "scripts/backup.sh"                                              # naming-compatibility comment
-  "scripts/tests/test_backup_restore_guards.sh"                    # legacy-prefix regression test
-  "CHANGELOG.md"                                                   # describes the branding migration itself
+  "scripts/check_docs.sh" # this script's own pattern-matching code/comments (checks 3 and 5)
 )
 
 is_allowlisted_branding_file() {
@@ -200,7 +182,7 @@ if [ -n "$branding_hits" ]; then
     fi
   done <<<"$branding_hits"
 fi
-[ "$unexpected_branding" -eq 1 ] || ok "no unallowlisted old \"Bug Fixer\" branding reference remains"
+[ "$unexpected_branding" -eq 1 ] || ok "no unallowlisted pre-rename branding reference remains"
 
 # --- 6. Every REPLACE-ME placeholder is one of the two expected ones -------
 

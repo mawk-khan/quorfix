@@ -140,11 +140,11 @@ under production settings).
 
 | Role | Email | Password |
 | --- | --- | --- |
-| Administrator | admin@bugfixer.local | QuorfixDemo2026! |
-| Developer | developer@bugfixer.local | DeveloperDemo2026! |
-| QA | qa@bugfixer.local | QADemo2026! |
-| Reporter | reporter@bugfixer.local | ReporterDemo2026! |
-| Viewer | viewer@bugfixer.local | ViewerDemo2026! |
+| Administrator | admin@quorfix.local | QuorfixDemo2026! |
+| Developer | developer@quorfix.local | DeveloperDemo2026! |
+| QA | qa@quorfix.local | QADemo2026! |
+| Reporter | reporter@quorfix.local | ReporterDemo2026! |
+| Viewer | viewer@quorfix.local | ViewerDemo2026! |
 
 `seed_demo` also creates three projects (`BFW`, `MOB`, `API`) with 24 demo bugs spread across
 every status, priority, and severity, backdated across roughly the previous 45 days so the
@@ -396,9 +396,7 @@ affected by the date range", etc.) — the date filter never silently does nothi
 - **Commit:** _(this change — update once committed)_
 - **Main functionality:** PostgreSQL and local-attachment backup/restore for
   `docker-compose.prod.yml`, treated as one coordinated recovery set. `scripts/backup.sh`
-  produces a timestamped `quorfix-backup-<UTC timestamp>/` directory (a pre-rename
-  `bugfixer-backup-<UTC timestamp>/` recovery set restores identically — see
-  `docs/BACKUP_AND_RESTORE.md` "Naming compatibility")
+  produces a timestamped `quorfix-backup-<UTC timestamp>/` directory
   (`manifest.txt`, `database.dump`, `attachments.tar.gz`, `checksums.sha256`);
   `scripts/restore_db.sh`/`scripts/restore_attachments.sh` restore one artifact each, both
   requiring an explicit `--confirm-restore` flag and validating checksum + manifest before
@@ -603,27 +601,25 @@ affected by the date range", etc.) — the date filter never silently does nothi
 ### Phase 6 Chunk K: Quorfix branding migration and Community release documentation
 - **Status:** Complete
 - **Commit:** _(this change — update once committed)_
-- **Product name:** Quorfix (previously "Bug Fixer" — this chunk is the rename).
+- **Product name:** Quorfix (renamed from this project's pre-launch working title).
 - **Official domain:** quorfix.com *(not yet confirmed live — do not assume DNS/TLS/email/hosting
   are configured; see `docs/INSTALLATION.md` "Required origins")*.
 - **Official repository:** https://github.com/mawk-khan/quorfix
 - **Current version:** `0.5.0-beta.1` (see root `VERSION` file — the single source of truth;
   not yet tagged).
-- **Main functionality:** A full audit (319 case-insensitive "bug fixer"/"bugfixer" matches
-  across 55 tracked files) classified every match before anything changed — see this chunk's
-  own completion report for the full table. User-facing text (page titles, AppShell, setup/
-  sign-in headings, invitation email subject, OpenAPI title/description, LICENSE copyright,
-  system-check IDs `quorfix.E0xx`, `SERVICE_NAME`/Celery app name defaults, browser tab titles
-  via a new `usePageTitle` hook — see `frontend/src/lib/use-page-title.ts`) now says Quorfix.
-  Compatibility-sensitive identifiers were deliberately **not** renamed: `BUGFIXER_DISPOSABLE_DATABASE`
-  (established env var), demo emails (still `@bugfixer.local` — intentional, see below),
-  `docker-compose.yml`'s Compose project name (`bug-fixer` — renaming it would orphan this
-  environment's own live `postgres_data` volume), and no Django app/migration/table was
-  touched. `seed_demo` now recognizes *either* the current (`quorfix-demo`) or the pre-rename
-  (`bug-fixer-demo`) organization slug — an existing local dev database is reused, never
-  silently renamed or duplicated. New backups use a `quorfix-backup-` prefix; restore tooling
-  never validated any directory-name prefix to begin with, so a pre-rename `bugfixer-backup-`
-  recovery set restores identically (see `docs/BACKUP_AND_RESTORE.md` "Naming compatibility").
+- **Main functionality:** A full audit of every old-branding match across the tracked tree
+  classified each one before anything changed — see this chunk's own completion report for the
+  full table. Every occurrence was replaced, including identifiers initially kept for
+  compatibility during the rename: the disposable-database guard env var is now
+  `QUORFIX_DISPOSABLE_DATABASE`, demo emails are `@quorfix.local`, `docker-compose.yml`'s Compose
+  project name is `quorfix` (the local dev stack was brought down and back up under the new
+  project name; the pre-rename `postgres_data` volume was left on disk, unused, rather than
+  migrated), `seed_demo` looks up only the current `quorfix-demo` organization slug, and
+  `scripts/backup.sh` only documents the `quorfix-backup-` prefix. No Django app, migration, or
+  table was touched, and no routes, roles, or API paths changed. User-facing text (page titles,
+  AppShell, setup/sign-in headings, invitation email subject, OpenAPI title/description, LICENSE
+  copyright, system-check IDs `quorfix.E0xx`, `SERVICE_NAME`/Celery app name defaults, browser tab
+  titles via a new `usePageTitle` hook — see `frontend/src/lib/use-page-title.ts`) says Quorfix.
   New root-level docs created: `docs/INSTALLATION.md`, `docs/RELEASING.md`,
   `THIRD_PARTY_NOTICES.md`, `CHANGELOG.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
   `.github/ISSUE_TEMPLATE/*`, `.github/PULL_REQUEST_TEMPLATE.md`. `.github/workflows/release.yml`
@@ -636,15 +632,9 @@ affected by the date range", etc.) — the date filter never silently does nothi
   suite; see that file's own comment). Backend development-dependency `pip-audit` is now a
   second, separately-blocking CI step (previously unscanned in CI). No routes, roles, or API
   paths changed.
-- **Demo credentials:** unchanged in substance — `admin@bugfixer.local` (still `.local`,
-  intentionally — see below) / `QuorfixDemo2026!` (password re-branded; `seed_demo` reconciles
-  it idempotently on re-run, same as every other persona field). Developer/QA/reporter/viewer
-  passwords were never "Bug Fixer"-branded and are unchanged. See the credentials table below.
-- **Why demo emails stay `@bugfixer.local`:** these are local-development-only, publicly
-  documented, non-production identifiers (`seed_demo` refuses to run under production settings
-  outright). Renaming the email domain has no security or branding benefit proportional to the
-  risk of silently breaking anyone's existing local fixtures/scripts that already reference
-  `@bugfixer.local` literally — kept for the beta; revisit post-beta if desired.
+- **Demo credentials:** `admin@quorfix.local` / `QuorfixDemo2026!` (`seed_demo` reconciles the
+  password idempotently on re-run, same as every other persona field). See the credentials table
+  below.
 - **Security contact status:** still a placeholder
   (`security@REPLACE-ME-quorfix.example`) — **release blocker**, see `docs/SECURITY.md`.
 - **Code of Conduct contact status:** still a placeholder

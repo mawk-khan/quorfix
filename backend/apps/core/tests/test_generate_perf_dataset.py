@@ -17,7 +17,7 @@ from apps.projects.models import Project
 
 
 def run(disposable=True, **kwargs):
-    """Invokes generate_perf_dataset with BUGFIXER_DISPOSABLE_DATABASE set
+    """Invokes generate_perf_dataset with QUORFIX_DISPOSABLE_DATABASE set
     (or deliberately absent, for disposable=False guard tests) — restoring
     whatever the environment variable's prior value was afterward, so one
     test's env mutation can never leak into the next."""
@@ -29,25 +29,25 @@ def run(disposable=True, **kwargs):
         if value is not True:
             args.append(str(value))
 
-    previous = os.environ.get("BUGFIXER_DISPOSABLE_DATABASE")
+    previous = os.environ.get("QUORFIX_DISPOSABLE_DATABASE")
     try:
         if disposable:
-            os.environ["BUGFIXER_DISPOSABLE_DATABASE"] = "true"
-        elif "BUGFIXER_DISPOSABLE_DATABASE" in os.environ:
-            del os.environ["BUGFIXER_DISPOSABLE_DATABASE"]
+            os.environ["QUORFIX_DISPOSABLE_DATABASE"] = "true"
+        elif "QUORFIX_DISPOSABLE_DATABASE" in os.environ:
+            del os.environ["QUORFIX_DISPOSABLE_DATABASE"]
         call_command("generate_perf_dataset", *args, stdout=out)
     finally:
         if previous is None:
-            os.environ.pop("BUGFIXER_DISPOSABLE_DATABASE", None)
+            os.environ.pop("QUORFIX_DISPOSABLE_DATABASE", None)
         else:
-            os.environ["BUGFIXER_DISPOSABLE_DATABASE"] = previous
+            os.environ["QUORFIX_DISPOSABLE_DATABASE"] = previous
     return out.getvalue()
 
 
 def run_cleanup() -> str:
     out = io.StringIO()
-    previous = os.environ.get("BUGFIXER_DISPOSABLE_DATABASE")
-    os.environ["BUGFIXER_DISPOSABLE_DATABASE"] = "true"
+    previous = os.environ.get("QUORFIX_DISPOSABLE_DATABASE")
+    os.environ["QUORFIX_DISPOSABLE_DATABASE"] = "true"
     try:
         call_command(
             "generate_perf_dataset",
@@ -57,9 +57,9 @@ def run_cleanup() -> str:
         )
     finally:
         if previous is None:
-            os.environ.pop("BUGFIXER_DISPOSABLE_DATABASE", None)
+            os.environ.pop("QUORFIX_DISPOSABLE_DATABASE", None)
         else:
-            os.environ["BUGFIXER_DISPOSABLE_DATABASE"] = previous
+            os.environ["QUORFIX_DISPOSABLE_DATABASE"] = previous
     return out.getvalue()
 
 
@@ -85,7 +85,7 @@ def test_refuses_to_run_under_production_environment():
 
 @pytest.mark.django_db
 def test_refuses_without_disposable_database_flag():
-    with pytest.raises(CommandError, match="BUGFIXER_DISPOSABLE_DATABASE"):
+    with pytest.raises(CommandError, match="QUORFIX_DISPOSABLE_DATABASE"):
         run(disposable=False, **TINY_KWARGS)
     assert not Organization.objects.filter(slug__startswith=PERF_SLUG_PREFIX).exists()
 
@@ -107,17 +107,6 @@ def test_refuses_when_database_name_looks_like_production():
 @pytest.mark.django_db
 def test_refuses_when_demo_organization_present():
     Organization.objects.create(name="Quorfix Demo", slug="quorfix-demo")
-    with pytest.raises(CommandError, match="demo"):
-        run(**TINY_KWARGS)
-    assert not Organization.objects.filter(slug__startswith=PERF_SLUG_PREFIX).exists()
-
-
-@pytest.mark.django_db
-def test_refuses_when_legacy_pre_rename_demo_organization_present():
-    """PROTECTED_ORG_SLUGS still recognizes the pre-Quorfix-rebrand slug —
-    a local dev database seeded before the rename must stay just as
-    protected as one seeded after it."""
-    Organization.objects.create(name="Bug Fixer Demo", slug="bug-fixer-demo")
     with pytest.raises(CommandError, match="demo"):
         run(**TINY_KWARGS)
     assert not Organization.objects.filter(slug__startswith=PERF_SLUG_PREFIX).exists()
@@ -369,7 +358,7 @@ def test_cleanup_refuses_outright_when_demo_organization_present(admin_user, mak
     them". Stronger than scoping the delete alone would be: a perf-owned
     organization present alongside a demo organization stays completely
     untouched, because the whole command refuses before touching anything."""
-    demo_org = Organization.objects.create(name="Bug Fixer Demo", slug="bug-fixer-demo")
+    demo_org = Organization.objects.create(name="Quorfix Demo", slug="quorfix-demo")
     make_membership(demo_org, admin_user, role=CommunityRole.ADMINISTRATOR)
     SetupLock.objects.filter(id=1).update(completed_at=timezone.now())
     perf_org = Organization.objects.create(name="Performance Org 1", slug="perf-001")
@@ -386,7 +375,7 @@ def test_cleanup_with_no_perf_data_is_a_safe_no_op():
     out = io.StringIO()
     import os
 
-    os.environ["BUGFIXER_DISPOSABLE_DATABASE"] = "true"
+    os.environ["QUORFIX_DISPOSABLE_DATABASE"] = "true"
     try:
         call_command(
             "generate_perf_dataset",
@@ -395,5 +384,5 @@ def test_cleanup_with_no_perf_data_is_a_safe_no_op():
             stdout=out,
         )
     finally:
-        del os.environ["BUGFIXER_DISPOSABLE_DATABASE"]
+        del os.environ["QUORFIX_DISPOSABLE_DATABASE"]
     assert "nothing to clean up" in out.getvalue().lower()

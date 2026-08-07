@@ -82,20 +82,13 @@ thing, not as four independent files that happen to share a timestamp.
 every step of the backup actually succeeded — see
 [Backup verification](#6-backup-verification).
 
-### Naming compatibility
-
-`quorfix-backup-` is the directory prefix new backups are created with,
-following the Phase 6 Chunk K product rename. It is **only a naming
-convention for new backups** — `restore_db.sh`/`restore_attachments.sh` take
-a direct path to `database.dump`/`attachments.tar.gz` and never inspect or
-require any particular parent-directory name; the only thing they validate
-is `manifest.txt`'s `format_version` field (see [Backup
-verification](#6-backup-verification)). A recovery set created before the
-rename, named `bugfixer-backup-YYYYmmddTHHMMSSZ/`, restores exactly the same
-way — nothing to convert, rename, or migrate. `format_version` (currently
-`1`) is the actual compatibility contract; the directory name has never been
-part of it. See `scripts/tests/test_backup_restore_guards.sh`'s legacy-prefix
-case for the automated proof.
+`quorfix-backup-` is only a naming convention —
+`restore_db.sh`/`restore_attachments.sh` take a direct path to
+`database.dump`/`attachments.tar.gz` and never inspect or require any
+particular parent-directory name; the only thing they validate is
+`manifest.txt`'s `format_version` field (see [Backup
+verification](#6-backup-verification)), which is the actual compatibility
+contract.
 
 ## 3. Before taking a backup
 

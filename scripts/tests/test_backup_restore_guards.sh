@@ -187,26 +187,25 @@ assert_output_not_contains "restore_db.sh: a valid input never fails on manifest
   "status is not 'complete'" \
   "$SCRIPTS_DIR/restore_db.sh" -f "$TMP/does-not-exist-compose.yml" --confirm-restore "$VALIDDIR/database.dump"
 
-# --- pre-rename ("bugfixer-backup-...") recovery set restores identically -
-# Phase 6 Chunk K: new backups use the "quorfix-backup-" prefix, but
-# restore_db.sh/restore_attachments.sh never inspected any directory-name
-# prefix to begin with (only manifest.txt's format_version) — this proves
-# that directly, with a legacy-style directory name, rather than asserting
-# an absence of behavior indirectly.
-LEGACYDIR="$TMP/bugfixer-backup-20260101T000000Z"
-mkdir -p "$LEGACYDIR"
-printf 'fake dump content\n' >"$LEGACYDIR/database.dump"
-(cd "$LEGACYDIR" && sha256_line_for database.dump) >"$LEGACYDIR/checksums.sha256"
-cat >"$LEGACYDIR/manifest.txt" <<'EOF'
+# --- a directory name outside the standard prefix restores identically ----
+# restore_db.sh/restore_attachments.sh never inspect any directory-name
+# prefix at all (only manifest.txt's format_version) — this proves that
+# directly, with a non-standard directory name, rather than asserting an
+# absence of behavior indirectly.
+CUSTOMDIR="$TMP/custom-recovery-set-20260101T000000Z"
+mkdir -p "$CUSTOMDIR"
+printf 'fake dump content\n' >"$CUSTOMDIR/database.dump"
+(cd "$CUSTOMDIR" && sha256_line_for database.dump) >"$CUSTOMDIR/checksums.sha256"
+cat >"$CUSTOMDIR/manifest.txt" <<'EOF'
 format_version=1
 status=complete
 EOF
-assert_output_contains "restore_db.sh: a legacy 'bugfixer-backup-' directory name restores like any other" \
+assert_output_contains "restore_db.sh: a non-standard directory name restores like any other" \
   "compose file not found" \
-  "$SCRIPTS_DIR/restore_db.sh" -f "$TMP/does-not-exist-compose.yml" --confirm-restore "$LEGACYDIR/database.dump"
-assert_output_not_contains "restore_db.sh: a legacy directory name never fails on checksum mismatch" \
+  "$SCRIPTS_DIR/restore_db.sh" -f "$TMP/does-not-exist-compose.yml" --confirm-restore "$CUSTOMDIR/database.dump"
+assert_output_not_contains "restore_db.sh: a non-standard directory name never fails on checksum mismatch" \
   "checksum mismatch" \
-  "$SCRIPTS_DIR/restore_db.sh" -f "$TMP/does-not-exist-compose.yml" --confirm-restore "$LEGACYDIR/database.dump"
+  "$SCRIPTS_DIR/restore_db.sh" -f "$TMP/does-not-exist-compose.yml" --confirm-restore "$CUSTOMDIR/database.dump"
 
 echo
 echo "$PASS passed, $FAIL failed"

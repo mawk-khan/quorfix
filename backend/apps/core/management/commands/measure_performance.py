@@ -8,7 +8,7 @@ classes, selectors, serializers) — network transport itself is the only
 thing not represented, which is exactly the point: this isolates
 application/database performance from local network variability.
 
-Not gated behind BUGFIXER_DISPOSABLE_DATABASE — this command only ever reads
+Not gated behind QUORFIX_DISPOSABLE_DATABASE — this command only ever reads
 data and issues requests against the already-running application; it never
 writes application data or deletes anything. It does require at least one
 organization matching the perf-owned naming convention

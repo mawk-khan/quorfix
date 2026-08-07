@@ -16,7 +16,7 @@ what a single request costs locally, on this hardware, on this dataset."
 
 Read this before running anything in this document against a real database.
 
-- `generate_perf_dataset` refuses to run at all unless `BUGFIXER_DISPOSABLE_DATABASE=true`
+- `generate_perf_dataset` refuses to run at all unless `QUORFIX_DISPOSABLE_DATABASE=true`
   is set in the environment for that one invocation. This variable exists
   *only* to gate this command — never set it in `.env`, never set it against
   a database you use for anything else.
@@ -27,7 +27,7 @@ Read this before running anything in this document against a real database.
 - The `--full` (~100,000-bug) profile requires **both** `--full` and
   `--confirm-disposable-database` — the two flags are independent and both
   required; neither is inferred from `DEBUG` or from
-  `BUGFIXER_DISPOSABLE_DATABASE` alone.
+  `QUORFIX_DISPOSABLE_DATABASE` alone.
 - Cleanup (`--cleanup-existing-perf-data`) requires the same
   `--confirm-disposable-database` flag, prints exactly what it is about to
   delete, and is scoped — by an assertion checked immediately before every
@@ -35,17 +35,15 @@ Read this before running anything in this document against a real database.
   `perf-`. It never issues a bare `TRUNCATE` and never resets a global
   sequence.
 - `measure_performance` is read-only (it never writes or deletes application
-  data) and is not gated behind `BUGFIXER_DISPOSABLE_DATABASE` for that
+  data) and is not gated behind `QUORFIX_DISPOSABLE_DATABASE` for that
   reason, but it authenticates as a real user and issues real requests, so
   point it at the same disposable database you generated data into.
 
 Every number in this document was produced against a disposable PostgreSQL
 container created solely for this exercise (`quorfix_perf_test`, a
 throwaway `postgres:16-alpine` container on a separate Docker volume, joined
-to the project's own `bug-fixer_default` network — docker-compose.yml's own
-Compose project name is deliberately unrenamed, see that file's own comment)
-— never against the project's own development database, and never against
-production.
+to the project's own `quorfix_default` network) — never against the
+project's own development database, and never against production.
 
 ## 3. Dataset profiles
 
@@ -68,16 +66,16 @@ defaults the un-overridden arguments resolve to (see
 
 ```bash
 # Small, safe default — always start here.
-BUGFIXER_DISPOSABLE_DATABASE=true \
+QUORFIX_DISPOSABLE_DATABASE=true \
   docker compose exec backend python manage.py generate_perf_dataset
 
 # Full ~100,000-bug dataset — slow (~2.5 minutes locally), needs both flags.
-BUGFIXER_DISPOSABLE_DATABASE=true \
+QUORFIX_DISPOSABLE_DATABASE=true \
   docker compose exec backend python manage.py generate_perf_dataset \
   --full --confirm-disposable-database
 
 # Cleanup — deletes every perf-owned organization and nothing else.
-BUGFIXER_DISPOSABLE_DATABASE=true \
+QUORFIX_DISPOSABLE_DATABASE=true \
   docker compose exec backend python manage.py generate_perf_dataset \
   --cleanup-existing-perf-data --confirm-disposable-database
 ```
@@ -482,7 +480,7 @@ current search semantics where possible."
 # 1. Point the stack at a disposable database (see §2) — do not skip this.
 
 # 2. Generate the full dataset (~2.5 minutes).
-BUGFIXER_DISPOSABLE_DATABASE=true docker compose exec backend \
+QUORFIX_DISPOSABLE_DATABASE=true docker compose exec backend \
   python manage.py generate_perf_dataset --full --confirm-disposable-database --seed 100
 
 # 3. Run every measurement scenario.
@@ -501,7 +499,7 @@ print(list_bugs(org, viewer=user, search='chart')[:25].explain(analyze=True, buf
 "
 
 # 5. Clean up when finished.
-BUGFIXER_DISPOSABLE_DATABASE=true docker compose exec backend \
+QUORFIX_DISPOSABLE_DATABASE=true docker compose exec backend \
   python manage.py generate_perf_dataset --cleanup-existing-perf-data --confirm-disposable-database
 ```
 
