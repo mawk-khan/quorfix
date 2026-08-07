@@ -13,6 +13,10 @@ on:
       - "frontend/**"
       - "docker-compose.yml"
       - ".github/workflows/e2e.yml"
+  # Lets this be run manually against any branch (e.g. master) without
+  # manufacturing a paths-matching commit — same job, same steps, just a
+  # different trigger. Adds no release/tag behavior of its own.
+  workflow_dispatch:
 
 concurrency:
   group: e2e-${{ github.workflow }}-${{ github.ref }}
@@ -28,6 +32,43 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      # Installed on the runner host, before any `docker compose` command —
+      # order matters here, not just convenience. docker-compose.yml's
+      # frontend service bind-mounts ./frontend:/app and layers a volume
+      # over /app/node_modules to isolate the container's own dependencies
+      # from the host. That isolation is real once the container is
+      # running, but on a fresh checkout (no ./frontend/node_modules yet)
+      # the *first* `docker compose up` still has to create a mount point
+      # for that nested volume — and since /app resolves to the host's
+      # ./frontend at that moment, the mount point is created there too,
+      # owned by root (this is inherent to bind-mount + nested-volume
+      # layering, not specific to anonymous vs. named volumes — confirmed
+      # directly, not assumed). A later host-side `npm ci` then fails with
+      # EACCES trying to write into that root-owned directory. Running
+      # `npm ci` first means ./frontend/node_modules already exists
+      # (host-user-owned) by the time `docker compose up` runs, so Docker
+      # reuses it as the mount point instead of creating it fresh — no
+      # ownership change happens to a directory that already exists.
+      - name: Check frontend/node_modules state before npm ci
+        working-directory: frontend
+        run: |
+          if [ -e node_modules ]; then
+            echo "node_modules exists before npm ci:"
+            stat node_modules
+          else
+            echo "node_modules does not exist yet (expected on a fresh checkout)."
+          fi
+
+      - name: Install Playwright's own dependencies
+        working-directory: frontend
+        run: npm ci
 
       # docker-compose.yml's backend/celery_worker/frontend all read
       # env_file: .env — .env.example's defaults are exactly the values a
@@ -49,6 +90,20 @@ jobs:
 
       - name: Start db, redis, backend, celery_worker, frontend
         run: docker compose up -d
+
+      # Confirms the fix above actually held: the host directory `npm ci`
+      # just populated must still be owned by the runner user after Docker
+      # has started the frontend container against it, not silently
+      # reclaimed by root.
+      - name: Verify frontend/node_modules ownership was not changed by Docker
+        working-directory: frontend
+        run: |
+          owner="$(stat -c '%U' node_modules)"
+          echo "frontend/node_modules owner after docker compose up: $owner"
+          if [ "$owner" != "$(whoami)" ]; then
+            echo "frontend/node_modules is no longer owned by the runner user ($owner) — Docker took ownership of a host path it should not have." >&2
+            exit 1
+          fi
 
       - name: Wait for backend to be ready
         run: |
@@ -93,23 +148,9 @@ jobs:
       - name: Apply migrations
         run: docker compose exec -T backend python manage.py migrate --no-input
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: "npm"
-          cache-dependency-path: frontend/package-lock.json
-
-      # Playwright itself runs on the runner host, driving a browser
-      # against the dockerized frontend at localhost:3000 (published by
-      # docker-compose.yml) — same shape as a developer running `npm run
-      # test:e2e` locally against their own already-running `docker compose
-      # up` stack. frontend/node_modules here is Playwright's own
-      # toolchain, unrelated to (and never mixed with) the frontend
-      # container's own node_modules built inside its image.
-      - name: Install Playwright's own dependencies
-        working-directory: frontend
-        run: npm ci
-
+      # Uses the Playwright version npm ci just installed from
+      # package-lock.json (not a separately/globally installed CLI), so the
+      # browser build downloaded here always matches the pinned version.
       - name: Install Playwright's Chromium browser
         working-directory: frontend
         run: npx playwright install --with-deps chromium
@@ -149,8 +190,11 @@ jobs:
           retention-days: 14
 
       # Runs even if an earlier step failed — removes the containers, the
-      # network, and (via -v) the named postgres_data volume, so the next
-      # run never inherits this run's database state.
+      # network, and (via -v) the named postgres_data/frontend_node_modules
+      # volumes, so the next run never inherits this run's state. Does not
+      # touch ./frontend/node_modules on the runner (that's the checkout
+      # workspace, not a Docker volume, and this runner is disposable
+      # anyway).
       - name: Tear down
         if: always()
         run: docker compose down -v

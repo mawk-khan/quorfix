@@ -61,6 +61,18 @@ if [ -f .env ]; then
 fi
 cp .env.example .env
 
+# Installed before any `docker compose` command runs — same reason as
+# .github/workflows/e2e.yml's step order: docker-compose.yml's frontend
+# service bind-mounts ./frontend:/app with a nested volume isolating
+# /app/node_modules from the host. On a checkout with no
+# ./frontend/node_modules yet, the *first* `docker compose up` still has
+# to create a mount point for that nested volume at the host path (root-
+# owned), which then blocks this exact `npm ci` with EACCES. Running
+# `npm ci` first means the directory already exists, host-user-owned, so
+# Docker reuses it instead of creating it fresh.
+log "Installing Playwright's own dependencies ..."
+(cd frontend && npm ci)
+
 log "Building images ..."
 docker compose -f "$COMPOSE_FILE" build
 
@@ -103,8 +115,8 @@ done
 log "Applying migrations ..."
 docker compose -f "$COMPOSE_FILE" exec -T backend python manage.py migrate --no-input
 
-log "Installing Playwright's own dependencies ..."
-(cd frontend && npm ci && npx playwright install --with-deps chromium)
+log "Installing Playwright's Chromium browser ..."
+(cd frontend && npx playwright install --with-deps chromium)
 
 log "Running the full Playwright suite (global-setup.ts resets and reseeds fixtures) ..."
 (cd frontend && npx playwright test)
