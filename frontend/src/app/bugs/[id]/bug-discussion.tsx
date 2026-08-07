@@ -2,9 +2,12 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
 
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ApiError } from "@/lib/api/client";
 import { commentKeys, createComment, listComments } from "@/lib/api/comments";
 import { activityKeys } from "@/lib/api/bugs";
@@ -111,16 +114,16 @@ export function BugDiscussion({ bugId, isArchived, canComment }: BugDiscussionPr
   const bodyValue = useWatch({ control, name: "body" });
 
   if (commentsQuery.isLoading) {
-    return <p className="text-sm text-gray-500">Loading discussion…</p>;
+    return <p className="text-sm text-text-secondary">Loading discussion…</p>;
   }
 
   if (commentsQuery.isError) {
     return (
-      <div role="alert" className="space-y-2 text-sm text-red-700">
+      <div role="alert" className="space-y-2 text-sm text-danger">
         <p>Could not load the discussion.</p>
-        <button type="button" onClick={() => commentsQuery.refetch()} className="rounded border px-3 py-1 underline">
+        <Button type="button" variant="secondary" size="sm" onClick={() => commentsQuery.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -130,9 +133,9 @@ export function BugDiscussion({ bugId, isArchived, canComment }: BugDiscussionPr
 
   return (
     <div className="space-y-4">
-      {comments.length === 0 && <p className="text-sm text-gray-500">No comments yet.</p>}
+      {comments.length === 0 && <EmptyState icon={MessageSquare} title="No comments yet" />}
 
-      <ul className="space-y-3">
+      <ul className="divide-y divide-border">
         {comments.map((comment) => (
           <CommentItem
             key={comment.id}
@@ -147,36 +150,38 @@ export function BugDiscussion({ bugId, isArchived, canComment }: BugDiscussionPr
 
       {commentsQuery.data && (commentsQuery.data.next || page > 1) && (
         <div className="flex items-center justify-between text-sm">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="rounded border px-3 py-1 disabled:opacity-50"
           >
             Previous
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((p) => p + 1)}
             disabled={!commentsQuery.data.next}
-            className="rounded border px-3 py-1 disabled:opacity-50"
           >
             Next
-          </button>
+          </Button>
         </div>
       )}
 
       {isArchived ? (
-        <p className="border-t pt-3 text-sm text-gray-500">
+        <p className="border-t border-border pt-3 text-sm text-text-secondary">
           This bug is archived, so new comments cannot be added. Existing comments remain visible.
         </p>
       ) : canComment ? (
         <form
           onSubmit={handleSubmit((values) => createMutation.mutate(values))}
-          className="space-y-2 border-t pt-3"
+          className="space-y-2 border-t border-border pt-3"
           aria-label="Add comment"
         >
-          <label htmlFor="new-comment-body" className="block text-sm font-medium">
+          <label htmlFor="new-comment-body" className="block text-sm font-medium text-text-primary">
             Add a comment
           </label>
           <Controller
@@ -195,29 +200,27 @@ export function BugDiscussion({ bugId, isArchived, canComment }: BugDiscussionPr
               />
             )}
           />
-          <div className="flex items-center justify-between text-xs text-gray-500">
+          <div className="flex items-center justify-between text-xs text-text-secondary">
             <span>{bodyValue?.length ?? 0} / 10,000</span>
           </div>
           {errors.body && (
-            <p id="new-comment-body-error" role="alert" className="text-sm text-red-700">
+            <p id="new-comment-body-error" role="alert" className="text-sm text-danger">
               {errors.body.message}
             </p>
           )}
           {createError && (
-            <p role="alert" className="text-sm text-red-700">
+            <p role="alert" className="text-sm text-danger">
               {createError}
             </p>
           )}
-          <button
-            type="submit"
-            disabled={createMutation.isPending}
-            className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
-          >
+          <Button type="submit" loading={createMutation.isPending}>
             Post comment
-          </button>
+          </Button>
         </form>
       ) : (
-        <p className="border-t pt-3 text-sm text-gray-500">Viewers can read the discussion but cannot comment.</p>
+        <p className="border-t border-border pt-3 text-sm text-text-secondary">
+          Viewers can read the discussion but cannot comment.
+        </p>
       )}
     </div>
   );

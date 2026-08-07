@@ -4,6 +4,10 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { activityKeys, addRelationship, listBugs, removeRelationship, type CreatableRelationshipType } from "@/lib/api/bugs";
 import type { Bug } from "@/lib/api/types";
 
@@ -63,16 +67,16 @@ export function BugRelationshipsPanel({ bug, onMutated, onError }: BugRelationsh
 
   return (
     <div className="space-y-3">
-      <h2 className="font-medium">Relationships</h2>
+      {bug.relationships.length === 0 && (
+        <p className="text-sm text-text-secondary">No relationships yet.</p>
+      )}
 
-      {bug.relationships.length === 0 && <p className="text-sm text-gray-500">No relationships yet.</p>}
-
-      <ul className="space-y-1 text-sm">
+      <ul className="space-y-2 text-sm">
         {bug.relationships.map((rel) => (
-          <li key={rel.id} className="flex items-center justify-between">
-            <span>
+          <li key={rel.id} className="flex items-center justify-between gap-2">
+            <span className="min-w-0 text-text-primary">
               {TYPE_LABELS[rel.type] ?? rel.type}{" "}
-              <Link href={`/bugs/${rel.bug.id}`} className="underline">
+              <Link href={`/bugs/${rel.bug.id}`} className="underline underline-offset-2 hover:text-primary">
                 {rel.bug.key}
               </Link>{" "}
               — {rel.bug.title}
@@ -82,7 +86,7 @@ export function BugRelationshipsPanel({ bug, onMutated, onError }: BugRelationsh
                 type="button"
                 onClick={() => removeMutation.mutate(rel.id)}
                 disabled={removeMutation.isPending}
-                className="text-xs text-red-700 underline disabled:opacity-50"
+                className="flex-none text-xs text-danger underline disabled:opacity-50"
               >
                 Remove
               </button>
@@ -100,43 +104,31 @@ export function BugRelationshipsPanel({ bug, onMutated, onError }: BugRelationsh
           className="flex flex-wrap items-end gap-2"
           aria-label="Add relationship"
         >
-          <div>
-            <label htmlFor="relationship-bug-key" className="block text-xs font-medium">
-              Bug key
-            </label>
-            <input
+          <FormField htmlFor="relationship-bug-key" label="Bug key">
+            <Input
               id="relationship-bug-key"
               value={relatedKey}
               onChange={(event) => setRelatedKey(event.target.value)}
               placeholder="e.g. BFW-2"
-              className="mt-1 rounded border px-2 py-1 text-sm"
             />
-          </div>
-          <div>
-            <label htmlFor="relationship-type" className="block text-xs font-medium">
-              Type
-            </label>
-            <select
+          </FormField>
+          <FormField htmlFor="relationship-type" label="Type">
+            <Select
               id="relationship-type"
               value={relationshipType}
               onChange={(event) => setRelationshipType(event.target.value as CreatableRelationshipType)}
-              className="mt-1 rounded border px-2 py-1 text-sm"
             >
               <option value="relates_to">Relates to</option>
               <option value="blocks">Blocks</option>
-            </select>
-          </div>
-          <button
-            type="submit"
-            disabled={addMutation.isPending}
-            className="rounded border px-3 py-1 text-sm disabled:opacity-50"
-          >
+            </Select>
+          </FormField>
+          <Button type="submit" variant="secondary" size="sm" disabled={addMutation.isPending}>
             Add
-          </button>
+          </Button>
         </form>
       )}
       {resolveError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger">
           {resolveError}
         </p>
       )}

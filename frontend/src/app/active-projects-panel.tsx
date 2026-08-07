@@ -21,17 +21,22 @@ export function ActiveProjectsPanel({ query }: ActiveProjectsPanelProps) {
       emptyMessage="No active projects."
     >
       {(projects) => (
-        <ul className="divide-y">
+        <ul className="divide-y divide-border">
           {projects.map((project) => (
             <li key={project.id} className="flex items-center justify-between py-2 text-sm">
               <div>
-                <Link href={`/projects/${project.id}`} className="font-medium underline">
+                <Link
+                  href={`/projects/${project.id}`}
+                  className="font-medium text-text-primary underline"
+                >
                   {project.key}
                 </Link>{" "}
-                — {project.name}
-                <span className="ml-2 text-xs text-gray-500">{formatStatusLabel(project.status)}</span>
+                <span className="text-text-primary">— {project.name}</span>
+                <span className="ml-2 text-xs text-text-secondary">
+                  {formatStatusLabel(project.status)}
+                </span>
               </div>
-              <div className="text-right text-xs text-gray-500">
+              <div className="text-right text-xs text-text-secondary">
                 <div>{formatCount(project.open_bugs)} open</div>
                 <div>{formatCount(project.total_bugs)} total</div>
               </div>

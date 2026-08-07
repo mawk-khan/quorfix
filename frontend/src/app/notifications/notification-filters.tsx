@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
 import type { NotificationEventType } from "@/lib/api/types";
 
 const EVENT_TYPE_OPTIONS: { value: NotificationEventType; label: string }[] = [
@@ -22,34 +23,34 @@ interface NotificationFiltersProps {
 
 export function NotificationFilters({ value, onChange }: NotificationFiltersProps) {
   return (
-    <div className="flex flex-wrap items-end gap-3">
+    <div className="flex flex-wrap items-end gap-4">
       <div>
-        <label htmlFor="notification-read-filter" className="block text-sm font-medium">
+        <label htmlFor="notification-read-filter" className="block text-sm font-medium text-text-primary">
           Read state
         </label>
-        <select
+        <Select
           id="notification-read-filter"
           value={value.read}
           onChange={(event) => onChange({ read: event.target.value as NotificationFiltersValue["read"] })}
-          className="mt-1 rounded border px-2 py-2"
+          className="mt-1.5 w-36"
         >
           <option value="">All</option>
           <option value="false">Unread</option>
           <option value="true">Read</option>
-        </select>
+        </Select>
       </div>
 
       <div>
-        <label htmlFor="notification-event-type-filter" className="block text-sm font-medium">
+        <label htmlFor="notification-event-type-filter" className="block text-sm font-medium text-text-primary">
           Event type
         </label>
-        <select
+        <Select
           id="notification-event-type-filter"
           value={value.event_type}
           onChange={(event) =>
             onChange({ event_type: event.target.value as NotificationFiltersValue["event_type"] })
           }
-          className="mt-1 rounded border px-2 py-2"
+          className="mt-1.5 w-48"
         >
           <option value="">Any</option>
           {EVENT_TYPE_OPTIONS.map((option) => (
@@ -57,7 +58,7 @@ export function NotificationFilters({ value, onChange }: NotificationFiltersProp
               {option.label}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
     </div>
   );

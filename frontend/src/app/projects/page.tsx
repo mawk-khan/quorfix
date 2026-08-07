@@ -6,6 +6,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { AccessState } from "@/components/access-state";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api/client";
 import { listProjects } from "@/lib/api/projects";
 import type { ArchivedFilter } from "@/lib/api/types";
@@ -110,44 +114,60 @@ function ProjectsPageContent() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-4xl space-y-6 p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Projects</h1>
-        {isAdmin && (
-          <Link href="/projects/new" className="rounded bg-black px-3 py-2 text-sm text-white">
-            New project
-          </Link>
-        )}
-      </div>
-
-      <ProjectFilters
-        search={search}
-        archived={archived}
-        onSearchChange={(value) => updateParams({ search: value, page: 1 })}
-        onArchivedChange={(value) => updateParams({ archived: value, page: 1 })}
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl space-y-6 p-8">
+      <PageHeader
+        title="Projects"
+        action={
+          isAdmin && (
+            <Link href="/projects/new" className={buttonVariants("primary", "md")}>
+              New project
+            </Link>
+          )
+        }
       />
 
-      {projectsQuery.isLoading && <p>Loading…</p>}
-
-      {projectsQuery.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {describeError(projectsQuery.error)}
-        </p>
-      )}
-
-      {projectsQuery.data && (
-        <>
-          <ProjectTable
-            projects={projectsQuery.data.results}
-            hasActiveFilters={!!search || archived !== "false"}
+      <Card>
+        <div className="border-b border-border p-5">
+          <ProjectFilters
+            search={search}
+            archived={archived}
+            onSearchChange={(value) => updateParams({ search: value, page: 1 })}
+            onArchivedChange={(value) => updateParams({ archived: value, page: 1 })}
           />
-          <PaginationControls
-            count={projectsQuery.data.count}
-            currentPage={page}
-            onPageChange={(nextPage) => updateParams({ page: nextPage })}
-          />
-        </>
-      )}
+        </div>
+
+        {projectsQuery.isLoading && (
+          <div className="p-5">
+            <Skeleton className="h-64" />
+          </div>
+        )}
+
+        {projectsQuery.isError && (
+          <div className="p-5">
+            <p role="alert" className="text-sm text-danger">
+              {describeError(projectsQuery.error)}
+            </p>
+          </div>
+        )}
+
+        {projectsQuery.data && (
+          <>
+            <ProjectTable
+              projects={projectsQuery.data.results}
+              hasActiveFilters={!!search || archived !== "false"}
+            />
+            {projectsQuery.data.results.length > 0 && (
+              <div className="border-t border-border p-4">
+                <PaginationControls
+                  count={projectsQuery.data.count}
+                  currentPage={page}
+                  onPageChange={(nextPage) => updateParams({ page: nextPage })}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </Card>
     </main>
   );
 }

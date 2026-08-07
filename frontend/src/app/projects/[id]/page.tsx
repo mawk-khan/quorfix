@@ -6,8 +6,15 @@ import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
+
 import { AccessState } from "@/components/access-state";
 import { AlertDialog } from "@/components/alert-dialog";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api/client";
 import { listMembers } from "@/lib/api/members";
 import { archiveProject, getProject, restoreProject, updateProject } from "@/lib/api/projects";
@@ -16,6 +23,7 @@ import { usePageTitle } from "@/lib/use-page-title";
 import { updateProjectSchema, type UpdateProjectFormValues } from "@/lib/validation/projects";
 
 import { ProjectForm } from "../project-form";
+import { PROJECT_STATUS_LABELS } from "../project-badges";
 
 function describeError(error: unknown): string {
   if (error instanceof ApiError && typeof error.body === "object" && error.body !== null) {
@@ -116,8 +124,8 @@ export default function ProjectDetailPage() {
 
   if (sessionLoading || projectQuery.isLoading) {
     return (
-      <main id="main-content" tabIndex={-1} className="p-8">
-        <p>Loading…</p>
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6 p-8">
+        <Skeleton className="h-64" />
       </main>
     );
   }
@@ -155,91 +163,103 @@ export default function ProjectDetailPage() {
   const isArchived = project.archived_at !== null;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl space-y-6 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6 p-8">
       <div>
-        <p className="font-mono text-sm text-gray-500">{project.key}</p>
-        <h1 className="text-xl font-semibold">{project.name}</h1>
-        {isArchived && <p className="mt-1 text-sm text-amber-700">Archived</p>}
+        <Link
+          href="/projects"
+          className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Back to projects
+        </Link>
+      </div>
+
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-sm text-text-secondary">{project.key}</span>
+            {isArchived && <Badge tone="amber">Archived</Badge>}
+          </div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-text-primary">{project.name}</h1>
+        </div>
       </div>
 
       {actionError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="rounded-field border border-danger/20 bg-danger-subtle p-3 text-sm text-danger">
           {actionError}
         </p>
       )}
 
       {!isAdmin && (
-        <dl className="space-y-2 text-sm">
-          <div>
-            <dt className="font-medium">Description</dt>
-            <dd>{project.description || "—"}</dd>
-          </div>
-          <div>
-            <dt className="font-medium">Status</dt>
-            <dd>{project.status.replace("_", " ")}</dd>
-          </div>
-          <div>
-            <dt className="font-medium">Lead</dt>
-            <dd>{leadLabel(project.lead)}</dd>
-          </div>
-        </dl>
+        <Card>
+          <CardContent>
+            <dl className="space-y-4 text-sm">
+              <div>
+                <dt className="font-medium text-text-primary">Description</dt>
+                <dd className="mt-1 whitespace-pre-wrap text-text-secondary">{project.description || "—"}</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-text-primary">Status</dt>
+                <dd className="mt-1 text-text-secondary">{PROJECT_STATUS_LABELS[project.status]}</dd>
+              </div>
+              <div>
+                <dt className="font-medium text-text-primary">Lead</dt>
+                <dd className="mt-1 text-text-secondary">{leadLabel(project.lead)}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
       )}
 
       {isAdmin && isArchived && (
-        <div className="space-y-3">
-          <p className="text-sm text-gray-500">Restore this project before editing it.</p>
-          <button
-            type="button"
-            onClick={() => restoreMutation.mutate()}
-            disabled={restoreMutation.isPending}
-            className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
-          >
-            Restore project
-          </button>
-        </div>
+        <Card>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-text-secondary">Restore this project before editing it.</p>
+            <Button type="button" onClick={() => restoreMutation.mutate()} disabled={restoreMutation.isPending}>
+              Restore project
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {isAdmin && !isArchived && (
-        <>
-          <ProjectForm
-            mode="edit"
-            register={register}
-            errors={errors}
-            onSubmit={handleSubmit((values) => updateMutation.mutate(values))}
-            isSubmitting={updateMutation.isPending}
-            members={membersQuery.data ?? []}
-            submitLabel="Save changes"
-          />
-          {updateMutation.isSuccess && (
-            <span role="status" className="text-sm text-gray-500">
-              Saved.
-            </span>
-          )}
-
-          <div className="border-t pt-4">
-            {!confirmingArchive ? (
-              <button
-                ref={archiveButtonRef}
-                type="button"
-                onClick={() => setConfirmingArchive(true)}
-                className="text-sm text-red-700 underline"
-              >
-                Archive project
-              </button>
-            ) : (
-              <AlertDialog
-                variant="inline"
-                title="Confirm archive project"
-                description="Archive this project?"
-                confirmLabel="Confirm"
-                onConfirm={() => archiveMutation.mutate()}
-                onCancel={() => setConfirmingArchive(false)}
-                pending={archiveMutation.isPending}
-                restoreFocusTo={archiveButtonRef}
-              />
+        <Card>
+          <CardContent>
+            <ProjectForm
+              mode="edit"
+              register={register}
+              errors={errors}
+              onSubmit={handleSubmit((values) => updateMutation.mutate(values))}
+              isSubmitting={updateMutation.isPending}
+              members={membersQuery.data ?? []}
+              submitLabel="Save changes"
+            />
+            {updateMutation.isSuccess && (
+              <span role="status" className="mt-2 block text-sm text-text-secondary">
+                Saved.
+              </span>
             )}
-          </div>
-        </>
+
+            <div className="mt-6 border-t border-border pt-4">
+              {!confirmingArchive ? (
+                <Button ref={archiveButtonRef} type="button" variant="danger" size="sm" onClick={() => setConfirmingArchive(true)}>
+                  Archive project
+                </Button>
+              ) : (
+                <AlertDialog
+                  variant="boxed"
+                  title="Confirm archive project"
+                  description="Archive this project?"
+                  confirmLabel="Confirm"
+                  onConfirm={() => archiveMutation.mutate()}
+                  onCancel={() => setConfirmingArchive(false)}
+                  pending={archiveMutation.isPending}
+                  restoreFocusTo={archiveButtonRef}
+                />
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
     </main>
   );

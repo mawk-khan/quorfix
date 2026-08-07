@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 // Matches BoundedPageNumberPagination's default page_size (apps/core/pagination.py) —
 // mirrors app/bugs/pagination-controls.tsx and app/projects/pagination-controls.tsx.
 export const NOTIFICATIONS_PAGE_SIZE = 25;
@@ -19,25 +21,27 @@ export function PaginationControls({ count, currentPage, onPageChange }: Paginat
 
   return (
     <nav aria-label="Pagination" className="flex items-center justify-between text-sm">
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage <= 1}
-        className="rounded border px-3 py-1 disabled:opacity-50"
       >
         Previous
-      </button>
-      <span aria-live="polite">
+      </Button>
+      <span aria-live="polite" className="text-text-secondary">
         Page {currentPage} of {totalPages}
       </span>
-      <button
+      <Button
         type="button"
+        variant="secondary"
+        size="sm"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage >= totalPages}
-        className="rounded border px-3 py-1 disabled:opacity-50"
       >
         Next
-      </button>
+      </Button>
     </nav>
   );
 }

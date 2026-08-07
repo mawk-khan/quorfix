@@ -137,6 +137,29 @@ the alternative. See the comment directly above the CSP definition in `next.conf
 full reasoning, including why a nonce-based policy was rejected (it would force this app's
 currently-static routes into per-request dynamic rendering app-wide).
 
+### Known development-only console warning: `eval()` blocked by CSP
+
+Running `npm run dev` and opening the browser devtools shows a recurring `Console Error`
+overlay: `eval() is not supported in this environment. If this page was served with a
+Content-Security-Policy header, make sure that 'unsafe-eval' is included.` This is expected and
+harmless — every page still renders and functions correctly around it. Do not "fix" it by adding
+`unsafe-eval` to the CSP.
+
+What's happening: React's development build uses `eval()` for some debugging features (e.g.
+reconstructing component stack traces across module boundaries). `next.config.ts`'s `headers()`
+applies the same CSP to every response regardless of `next dev` vs. `next build`/`next start`,
+and that CSP has never included `unsafe-eval` (see the comment above the CSP definition — "No
+unsafe-eval anywhere: production Turbopack output does not use eval()"), so React's dev-mode
+`eval()` call is blocked and logged, exactly as the CSP is supposed to do.
+
+Verified this is genuinely dev-only and not a build-output regression: `npm run build` (Turbopack
+production build) completes cleanly, and every route was manually exercised end-to-end (filters,
+mutations, comments/mentions, attachments, notifications) with no functional breakage from this
+warning — the CSP's lack of `unsafe-eval` was never the thing gating any of that. If a
+development-only relaxation is ever wanted, it must be explicit (e.g. `process.env.NODE_ENV
+=== "development"` gating a separate, narrower dev CSP) and tested on its own — not folded into
+an unrelated change.
+
 ## Attachment security model
 
 - Content-type allowlist with no SVG (inline SVG can carry script — a stored-XSS vector) — see

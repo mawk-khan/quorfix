@@ -1,19 +1,28 @@
-// Values from the dataviz skill's validated reference palette
-// (references/palette.md) — light mode only, matching this app's current
-// styling (no dark-mode system exists anywhere else in the app yet, so
-// this doesn't introduce a half-implemented one). Categorical slots 1
-// (blue) and 2 (orange) are the palette's own adjacent-safe pair (worst
-// adjacent CVD ΔE 9.1, normal-vision ΔE 19.6 — both clear the validator's
-// gates), used for the trends chart's two series.
+// Structural values (grid/axis/text/surface) are aliases of this app's own
+// design tokens (see app/globals.css's @theme block) — not a separate
+// palette, so charts render in the same cool-gray system as every card,
+// border, and label elsewhere in Quorfix. seriesCreated/singleMeasure use
+// the brand primary. The one exception is seriesResolved: kept as the
+// dataviz skill's validated categorical-slot-2 orange (blue vs. orange is
+// the classic CVD-safe pairing — orthogonal to the red-green confusion
+// axis that affects most color vision deficiency, so shifting the exact
+// blue shade to the brand primary doesn't threaten that separation).
+//
+// Light mode only — no dark-mode system exists anywhere else in the app
+// yet, so this doesn't introduce a half-implemented one.
+//
+// textMuted is deliberately absent here: axis tick labels are real
+// information (not decorative), so they use textSecondary — the same
+// 7.5:1-contrast token every other real label in the app uses — never the
+// muted token, which globals.css documents as decorative-only.
 
 export const CHART_COLORS = {
-  seriesCreated: "#2a78d6", // categorical slot 1 — blue
-  seriesResolved: "#eb6834", // categorical slot 2 — orange
-  singleMeasure: "#2a78d6", // one hue for single-series bars (resolution time, status, severity)
-  grid: "#e1e0d9", // hairline gridline
-  axis: "#c3c2b7", // baseline/axis
-  textMuted: "#898781", // axis tick labels
-  textSecondary: "#52514e",
-  textPrimary: "#0b0b0b",
-  surface: "#fcfcfb",
+  seriesCreated: "#375dfb", // brand primary
+  seriesResolved: "#eb6834", // dataviz skill's validated categorical slot 2 — orange
+  singleMeasure: "#375dfb", // one hue for single-series bars (resolution time, status, severity)
+  grid: "#e5e7eb", // = --color-border
+  axis: "#d1d5db", // = --color-border-strong
+  textSecondary: "#475569", // = --color-text-secondary — axis tick labels
+  textPrimary: "#0a0d14", // = --color-text-primary — tooltip text
+  surface: "#ffffff", // = --color-surface
 } as const;

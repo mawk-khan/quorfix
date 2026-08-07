@@ -1,9 +1,11 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
+import { File, FileImage, FileText, FileVideo } from "lucide-react";
 import { useRef, useState } from "react";
 
 import { AlertDialog } from "@/components/alert-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { ApiError } from "@/lib/api/client";
 import {
   attachmentKeys,
@@ -12,6 +14,7 @@ import {
   removeAttachment,
 } from "@/lib/api/attachments";
 import { activityKeys } from "@/lib/api/bugs";
+import { formatDateTime } from "@/lib/dashboard/format";
 import type { Attachment, PaginatedResponse } from "@/lib/api/types";
 
 const SCAN_STATUS_LABELS: Record<Attachment["scan_status"], string> = {
@@ -95,52 +98,76 @@ function AttachmentRow({ bugId, attachment }: { bugId: string; attachment: Attac
 
   if (removed) return null;
 
+  const FileIcon = attachment.content_type.startsWith("image/")
+    ? FileImage
+    : attachment.content_type.startsWith("video/")
+      ? FileVideo
+      : attachment.content_type.startsWith("text/") || attachment.content_type === "application/json"
+        ? FileText
+        : File;
+
   return (
-    <li className="space-y-1 border-t pt-2 text-sm" data-testid="attachment-row">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-medium">{attachment.original_filename}</span>
-        <span className="text-xs text-gray-500">{attachment.content_type}</span>
-        <span className="text-xs text-gray-500">{formatFileSize(attachment.size_bytes)}</span>
-        <span className="text-xs text-gray-500">{SCAN_STATUS_LABELS[attachment.scan_status]}</span>
-      </div>
-      <div className="text-xs text-gray-500">
-        Uploaded by {actorLabel(attachment.uploaded_by)}
-        {attachment.uploaded_at && ` on ${new Date(attachment.uploaded_at).toLocaleString()}`}
-      </div>
+    <li
+      className="flex items-start gap-3 rounded-field border border-border p-3 text-sm"
+      data-testid="attachment-row"
+    >
+      <span
+        aria-hidden="true"
+        className="flex size-9 flex-none items-center justify-center rounded-field bg-page text-text-secondary"
+      >
+        <FileIcon className="size-[18px]" />
+      </span>
 
-      {rowError && (
-        <p role="alert" className="text-xs text-red-700">
-          {rowError}
-        </p>
-      )}
+      <div className="min-w-0 flex-1 space-y-1">
+        <div className="flex flex-wrap items-center gap-x-2">
+          <span className="font-medium text-text-primary">{attachment.original_filename}</span>
+          <span className="text-xs text-text-secondary">{formatFileSize(attachment.size_bytes)}</span>
+          <span className="text-xs text-text-secondary">{SCAN_STATUS_LABELS[attachment.scan_status]}</span>
+        </div>
+        <div className="text-xs text-text-secondary">
+          Uploaded by {actorLabel(attachment.uploaded_by)}
+          {attachment.uploaded_at && ` on ${formatDateTime(attachment.uploaded_at)}`}
+        </div>
 
-      <div className="flex items-center gap-3 text-xs">
-        <button type="button" onClick={handleDownload} disabled={pending === "download"} className="text-blue-700 underline disabled:opacity-50">
-          Download
-        </button>
-        {attachment.can_remove && !confirmingRemove && (
+        {rowError && (
+          <p role="alert" className="text-xs text-danger">
+            {rowError}
+          </p>
+        )}
+
+        <div className="flex items-center gap-3 text-xs">
           <button
-            ref={removeButtonRef}
             type="button"
-            onClick={() => setConfirmingRemove(true)}
-            className="text-red-700 underline"
+            onClick={handleDownload}
+            disabled={pending === "download"}
+            className="font-medium text-primary underline disabled:opacity-50"
           >
-            Remove
+            Download
           </button>
+          {attachment.can_remove && !confirmingRemove && (
+            <button
+              ref={removeButtonRef}
+              type="button"
+              onClick={() => setConfirmingRemove(true)}
+              className="font-medium text-danger underline"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+
+        {confirmingRemove && (
+          <AlertDialog
+            title="Confirm remove attachment"
+            description="Remove this attachment? This cannot be undone."
+            confirmLabel="Confirm remove"
+            onConfirm={handleRemove}
+            onCancel={() => setConfirmingRemove(false)}
+            pending={pending === "remove"}
+            restoreFocusTo={removeButtonRef}
+          />
         )}
       </div>
-
-      {confirmingRemove && (
-        <AlertDialog
-          title="Confirm remove attachment"
-          description="Remove this attachment? This cannot be undone."
-          confirmLabel="Confirm remove"
-          onConfirm={handleRemove}
-          onCancel={() => setConfirmingRemove(false)}
-          pending={pending === "remove"}
-          restoreFocusTo={removeButtonRef}
-        />
-      )}
     </li>
   );
 }
@@ -152,7 +179,7 @@ export interface AttachmentListProps {
 
 export function AttachmentList({ bugId, attachments }: AttachmentListProps) {
   if (attachments.length === 0) {
-    return <p className="text-sm text-gray-500">No attachments yet.</p>;
+    return <EmptyState icon={File} title="No attachments yet" />;
   }
 
   return (

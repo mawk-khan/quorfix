@@ -20,38 +20,36 @@ export function RecentActivityFeed({ query }: RecentActivityFeedProps) {
   return (
     <DashboardSection
       title="Recent activity"
+      subtitle="Most recent first — not affected by the date range"
       query={query}
       isEmpty={(data) => data.results.length === 0}
       emptyMessage="No recent activity."
     >
       {(page) => (
-        <>
-          <p className="mb-2 text-xs text-gray-500">Most recent first — not affected by the date range</p>
-          <ul className="divide-y">
-            {page.results.map((activity) => (
-              <li key={activity.id} className="py-2 text-sm">
-                <span className="font-medium">{actorLabel(activity.actor)}</span>{" "}
-                {VERB_LABELS[activity.verb] ?? activity.verb}
-                {activity.from_value && activity.to_value && (
-                  <span className="text-gray-600">
-                    {" "}
-                    ({activity.from_value} → {activity.to_value})
-                  </span>
-                )}
-                {!activity.from_value && activity.to_value && (
-                  <span className="text-gray-600"> ({activity.to_value})</span>
-                )}
-                <div className="mt-0.5 text-xs text-gray-500">
-                  <Link href={`/bugs/${activity.bug.id}`} className="underline">
-                    {activity.bug.key}
-                  </Link>{" "}
-                  — {activity.bug.title} ({activity.project.key})
-                  <span className="ml-2">{formatDateTime(activity.created_at)}</span>
-                </div>
-              </li>
-            ))}
-          </ul>
-        </>
+        <ul className="divide-y divide-border">
+          {page.results.map((activity) => (
+            <li key={activity.id} className="py-2 text-sm text-text-primary">
+              <span className="font-medium">{actorLabel(activity.actor)}</span>{" "}
+              {VERB_LABELS[activity.verb] ?? activity.verb}
+              {activity.from_value && activity.to_value && (
+                <span className="text-text-secondary">
+                  {" "}
+                  ({activity.from_value} → {activity.to_value})
+                </span>
+              )}
+              {!activity.from_value && activity.to_value && (
+                <span className="text-text-secondary"> ({activity.to_value})</span>
+              )}
+              <div className="mt-0.5 text-xs text-text-secondary">
+                <Link href={`/bugs/${activity.bug.id}`} className="underline">
+                  {activity.bug.key}
+                </Link>{" "}
+                — {activity.bug.title} ({activity.project.key})
+                <span className="ml-2">{formatDateTime(activity.created_at)}</span>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </DashboardSection>
   );

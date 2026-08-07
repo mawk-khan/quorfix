@@ -84,6 +84,43 @@ describe("MentionTextarea", () => {
     expect(screen.getByTestId("value")).toHaveTextContent("@[Ada Lovelace](mention:u1)");
   });
 
+  it("wires the editable-combobox ARIA relationship correctly (role, aria-expanded/controls/activedescendant, aria-selected)", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    const textarea = screen.getByLabelText("Comment");
+
+    // Closed state: combobox role present, nothing claims to be expanded or
+    // to own/point at a listbox that doesn't exist yet.
+    expect(textarea).toHaveAttribute("role", "combobox");
+    expect(textarea).toHaveAttribute("aria-autocomplete", "list");
+    expect(textarea).toHaveAttribute("aria-expanded", "false");
+    expect(textarea).not.toHaveAttribute("aria-controls");
+    expect(textarea).not.toHaveAttribute("aria-activedescendant");
+
+    await user.type(textarea, "@");
+    const listbox = await screen.findByRole("listbox");
+    const options = screen.getAllByRole("option");
+
+    // Open state: aria-controls must resolve to the listbox actually in the
+    // DOM, and aria-activedescendant must resolve to the currently-active
+    // option — both are id references, so assert the target exists and
+    // matches, not just that some string is present.
+    expect(textarea).toHaveAttribute("aria-expanded", "true");
+    expect(textarea).toHaveAttribute("aria-controls", listbox.id);
+    expect(textarea).toHaveAttribute("aria-activedescendant", options[0]!.id);
+    expect(options[0]).toHaveAttribute("aria-selected", "true");
+    expect(options[1]).toHaveAttribute("aria-selected", "false");
+
+    // ArrowDown moves the active option — aria-activedescendant and
+    // aria-selected must move with it (this is what lets a screen reader
+    // announce the newly-active option without moving real focus off the
+    // textarea, per the WAI-ARIA APG editable-combobox pattern).
+    await user.keyboard("{ArrowDown}");
+    expect(textarea).toHaveAttribute("aria-activedescendant", options[1]!.id);
+    expect(options[0]).toHaveAttribute("aria-selected", "false");
+    expect(options[1]).toHaveAttribute("aria-selected", "true");
+  });
+
   it("does not insert a second token when the same user is mentioned again", async () => {
     const user = userEvent.setup();
     render(<Harness />);

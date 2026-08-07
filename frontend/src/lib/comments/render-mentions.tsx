@@ -44,7 +44,7 @@ export function renderCommentBody(body: string): ReactNode[] {
       nodes.push(
         <span
           key={`mention-${key++}`}
-          className="rounded bg-blue-50 px-1 font-medium text-blue-800"
+          className="rounded-field bg-primary-subtle px-1 font-medium text-primary"
           data-testid="mention-token"
         >
           @{displayName}

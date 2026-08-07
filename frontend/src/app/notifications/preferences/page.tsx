@@ -3,7 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
+import { ArrowLeft } from "lucide-react";
+
 import { AccessState } from "@/components/access-state";
+import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api/client";
 import { listNotificationPreferences, notificationKeys, updateNotificationPreference } from "@/lib/api/notifications";
 import type { NotificationEventType } from "@/lib/api/types";
@@ -49,8 +55,8 @@ export default function NotificationPreferencesPage() {
 
   if (sessionLoading || preferencesQuery.isLoading) {
     return (
-      <main id="main-content" tabIndex={-1} className="p-8">
-        <p>Loading…</p>
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6 p-8">
+        <Skeleton className="h-64" />
       </main>
     );
   }
@@ -70,7 +76,7 @@ export default function NotificationPreferencesPage() {
   if (preferencesQuery.isError) {
     return (
       <main id="main-content" tabIndex={-1} className="p-8">
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="text-sm text-danger">
           {describeError(preferencesQuery.error)}
         </p>
       </main>
@@ -80,34 +86,42 @@ export default function NotificationPreferencesPage() {
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6 p-8">
       <div>
-        <Link href="/notifications" className="text-sm text-blue-700 underline">
-          ← Back to notifications
+        <Link
+          href="/notifications"
+          className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Back to notifications
         </Link>
-        <h1 className="mt-2 text-xl font-semibold">Email notification preferences</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          In-app notifications are always created and cannot be disabled. These toggles control
-          email delivery only.
-        </p>
       </div>
 
-      <ul className="divide-y rounded border">
-        {(preferencesQuery.data ?? []).map((preference) => (
-          <li key={preference.event_type} className="flex items-center justify-between gap-3 px-4 py-3">
-            <label htmlFor={`notification-preference-${preference.event_type}`} className="text-sm">
-              {EVENT_TYPE_LABELS[preference.event_type]}
-            </label>
-            <input
-              id={`notification-preference-${preference.event_type}`}
-              type="checkbox"
-              checked={preference.email_enabled}
-              onChange={(event) =>
-                updateMutation.mutate({ eventType: preference.event_type, emailEnabled: event.target.checked })
-              }
-              aria-label={`Email me: ${EVENT_TYPE_LABELS[preference.event_type]}`}
-            />
-          </li>
-        ))}
-      </ul>
+      <PageHeader
+        title="Email notification preferences"
+        description="In-app notifications are always created and cannot be disabled. These toggles control email delivery only."
+      />
+
+      <Card>
+        <ul className="divide-y divide-border">
+          {(preferencesQuery.data ?? []).map((preference) => (
+            <li key={preference.event_type} className="flex items-center justify-between gap-3 px-5 py-3.5">
+              <label
+                htmlFor={`notification-preference-${preference.event_type}`}
+                className="text-sm text-text-primary"
+              >
+                {EVENT_TYPE_LABELS[preference.event_type]}
+              </label>
+              <Checkbox
+                id={`notification-preference-${preference.event_type}`}
+                checked={preference.email_enabled}
+                onChange={(event) =>
+                  updateMutation.mutate({ eventType: preference.event_type, emailEnabled: event.target.checked })
+                }
+                aria-label={`Email me: ${EVENT_TYPE_LABELS[preference.event_type]}`}
+              />
+            </li>
+          ))}
+        </ul>
+      </Card>
     </main>
   );
 }

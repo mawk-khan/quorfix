@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   analyticsKeys,
   getActiveProjects,
@@ -125,7 +127,7 @@ function DashboardPageContent() {
 
   return (
     <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl space-y-6 p-8">
-      <h1 className="text-xl font-semibold">Dashboard</h1>
+      <PageHeader title="Dashboard" />
 
       <DashboardFilters
         filters={filters}
@@ -134,7 +136,7 @@ function DashboardPageContent() {
       />
 
       {!ready ? (
-        <div className="h-32 animate-pulse rounded bg-gray-100" aria-hidden="true" />
+        <Skeleton className="h-32" />
       ) : (
         <>
           <SummaryCards query={summaryQuery} />

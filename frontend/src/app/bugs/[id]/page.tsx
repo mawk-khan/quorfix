@@ -2,12 +2,22 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowLeft, Eye, EyeOff, Pencil } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { AccessState } from "@/components/access-state";
 import { AlertDialog } from "@/components/alert-dialog";
+import { Avatar } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
+import { Input, Textarea } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   addTag,
   archiveBug,
@@ -25,11 +35,13 @@ import { ApiError } from "@/lib/api/client";
 import { listMembers } from "@/lib/api/members";
 import type { Bug, BugStatus } from "@/lib/api/types";
 import { useSession } from "@/lib/auth/session-provider";
+import { formatDateTime, formatStatusLabel } from "@/lib/dashboard/format";
 import { errorProps } from "@/lib/forms/error-props";
 import { usePageTitle } from "@/lib/use-page-title";
 import { addTagSchema, type AddTagFormValues, updateBugSchema, type UpdateBugFormValues } from "@/lib/validation/bugs";
+import { BUG_PRIORITIES, BUG_SEVERITIES } from "@/lib/validation/bugs";
 
-import { PriorityBadge, SeverityBadge, StatusBadge } from "../bug-badges";
+import { PRIORITY_LABELS, SEVERITY_LABELS, PriorityBadge, SeverityBadge, StatusBadge } from "../bug-badges";
 import { BugActivityFeed } from "./bug-activity-feed";
 import { BugAttachments } from "./bug-attachments";
 import { BugDiscussion } from "./bug-discussion";
@@ -62,6 +74,11 @@ function describeError(error: unknown): string {
     }
   }
   return "Something went wrong.";
+}
+
+function userLabel(user: { first_name: string; last_name: string; email: string }): string {
+  const fullName = `${user.first_name} ${user.last_name}`.trim();
+  return fullName || user.email;
 }
 
 export default function BugDetailPage() {
@@ -260,8 +277,8 @@ export default function BugDetailPage() {
 
   if (sessionLoading || bugQuery.isLoading) {
     return (
-      <main id="main-content" tabIndex={-1} className="p-8">
-        <p>Loading…</p>
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl space-y-6 p-8">
+        <Skeleton className="h-64" />
       </main>
     );
   }
@@ -296,7 +313,7 @@ export default function BugDetailPage() {
   }
 
   const isArchived = bug.archived_at !== null;
-  const canEditContent = bug.editable_fields.length > 0;
+  const canEditContent = bug.editable_fields.length > 0 && !isArchived;
   // Comments and attachment uploads share the same role gate on the backend
   // (apps.comments.policies.CAN_COMMENT_ROLES / apps.attachments.policies.
   // CAN_UPLOAD_ROLES — administrator, developer, qa, reporter; viewer
@@ -305,406 +322,468 @@ export default function BugDetailPage() {
   const canCollaborate = session.role !== null && session.role !== "viewer";
   const eligibleAssignees = (membersQuery.data ?? []).filter((m) => ASSIGNABLE_ROLES.has(m.role));
 
+  function jumpToEdit() {
+    const field = document.getElementById("edit-title");
+    field?.focus();
+    field?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl space-y-8 p-8">
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl space-y-6 p-8">
       <div>
-        <p className="font-mono text-sm text-gray-500">{bug.key}</p>
-        <h1 className="text-xl font-semibold">{bug.title}</h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <StatusBadge status={bug.status} />
-          <PriorityBadge priority={bug.priority} />
-          <SeverityBadge severity={bug.severity} />
-          {isArchived && <span className="text-sm text-amber-700">Archived</span>}
+        <Link
+          href="/bugs"
+          className="inline-flex items-center gap-1 text-sm text-text-secondary hover:text-text-primary"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Back to bugs
+        </Link>
+      </div>
+
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-mono text-sm text-text-secondary">{bug.key}</span>
+            <StatusBadge status={bug.status} />
+            <PriorityBadge priority={bug.priority} />
+            <SeverityBadge severity={bug.severity} />
+            {isArchived && <Badge tone="amber">Archived</Badge>}
+          </div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-text-primary">{bug.title}</h1>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-text-secondary">
+            {bug.watcher_count} watcher{bug.watcher_count === 1 ? "" : "s"}
+          </span>
+          {bug.is_watching ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={<EyeOff aria-hidden="true" className="size-4" />}
+              onClick={() => unwatchMutation.mutate()}
+              disabled={unwatchMutation.isPending}
+            >
+              Unwatch
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={<Eye aria-hidden="true" className="size-4" />}
+              onClick={() => watchMutation.mutate()}
+              disabled={watchMutation.isPending}
+            >
+              Watch
+            </Button>
+          )}
+          {canEditContent && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              icon={<Pencil aria-hidden="true" className="size-4" />}
+              onClick={jumpToEdit}
+            >
+              Edit
+            </Button>
+          )}
+          {bug.can_archive &&
+            (isArchived ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => restoreMutation.mutate()}
+                disabled={restoreMutation.isPending}
+              >
+                Restore bug
+              </Button>
+            ) : (
+              <Button
+                ref={archiveButtonRef}
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={() => setConfirmingArchive(true)}
+              >
+                Archive bug
+              </Button>
+            ))}
         </div>
       </div>
 
       {actionError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="rounded-field border border-danger/20 bg-danger-subtle p-3 text-sm text-danger">
           {actionError}
         </p>
       )}
 
       {conflictBug && (
-        <div role="alert" className="space-y-2 rounded border border-amber-400 bg-amber-50 p-3 text-sm">
+        <div
+          role="alert"
+          className="space-y-2 rounded-field border border-warning/30 bg-warning-subtle p-3 text-sm text-warning"
+        >
           <p>This bug was changed by someone else since you loaded it.</p>
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => {
               queryClient.setQueryData(["bugs", "detail", id], conflictBug);
               setConflictBug(null);
             }}
-            className="rounded border border-amber-600 px-3 py-1 text-amber-900"
           >
             Reload latest version
-          </button>
+          </Button>
         </div>
+      )}
+
+      {confirmingArchive && (
+        <AlertDialog
+          variant="boxed"
+          title="Confirm archive bug"
+          description="Archive this bug?"
+          confirmLabel="Confirm"
+          onConfirm={() => archiveMutation.mutate()}
+          onCancel={() => setConfirmingArchive(false)}
+          pending={archiveMutation.isPending}
+          restoreFocusTo={archiveButtonRef}
+        />
       )}
 
       {isArchived && (
-        <div className="space-y-2">
-          <p className="text-sm text-gray-500">This bug is archived and cannot be edited.</p>
-          {bug.can_archive && (
-            <button
-              type="button"
-              onClick={() => restoreMutation.mutate()}
-              disabled={restoreMutation.isPending}
-              className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
-            >
-              Restore bug
-            </button>
-          )}
-        </div>
+        <p className="text-sm text-text-secondary">This bug is archived and cannot be edited.</p>
       )}
 
-      {!isArchived && (
-        <section className="space-y-4">
-          <h2 className="font-medium">Details</h2>
-          {canEditContent ? (
-            <form
-              onSubmit={handleSubmit((values) => updateMutation.mutate(values))}
-              className="space-y-3"
-              aria-label="Edit bug"
-            >
-              {bug.editable_fields.includes("title") && (
-                <div>
-                  <label htmlFor="edit-title" className="block text-sm font-medium">
-                    Title
-                  </label>
-                  <input
-                    id="edit-title"
-                    className="mt-1 w-full rounded border px-3 py-2"
-                    {...errorProps("edit-title", errors.title)}
-                    {...register("title")}
-                  />
-                  {errors.title && (
-                    <p id="edit-title-error" role="alert" className="mt-1 text-sm text-red-700">
-                      {errors.title.message}
-                    </p>
-                  )}
-                </div>
-              )}
-              {bug.editable_fields.includes("description") && (
-                <div>
-                  <label htmlFor="edit-description" className="block text-sm font-medium">
-                    Description
-                  </label>
-                  <textarea
-                    id="edit-description"
-                    rows={3}
-                    className="mt-1 w-full rounded border px-3 py-2"
-                    {...register("description")}
-                  />
-                </div>
-              )}
-              {bug.editable_fields.includes("steps_to_reproduce") && (
-                <div>
-                  <label htmlFor="edit-steps" className="block text-sm font-medium">
-                    Steps to reproduce
-                  </label>
-                  <textarea
-                    id="edit-steps"
-                    rows={3}
-                    className="mt-1 w-full rounded border px-3 py-2"
-                    {...register("steps_to_reproduce")}
-                  />
-                </div>
-              )}
-              {bug.editable_fields.includes("category") && (
-                <div>
-                  <label htmlFor="edit-category" className="block text-sm font-medium">
-                    Category
-                  </label>
-                  <input
-                    id="edit-category"
-                    className="mt-1 w-full rounded border px-3 py-2"
-                    {...register("category")}
-                  />
-                </div>
-              )}
-              {bug.editable_fields.includes("due_date") && (
-                <div>
-                  <label htmlFor="edit-due-date" className="block text-sm font-medium">
-                    Due date
-                  </label>
-                  <input
-                    id="edit-due-date"
-                    type="date"
-                    className="mt-1 rounded border px-3 py-2"
-                    {...register("due_date")}
-                  />
-                </div>
-              )}
-              {bug.editable_fields.includes("priority") && (
-                <div>
-                  <label htmlFor="edit-priority" className="block text-sm font-medium">
-                    Priority
-                  </label>
-                  <select id="edit-priority" className="mt-1 rounded border px-2 py-2" {...register("priority")}>
-                    <option value="urgent">urgent</option>
-                    <option value="high">high</option>
-                    <option value="medium">medium</option>
-                    <option value="low">low</option>
-                  </select>
-                </div>
-              )}
-              {bug.editable_fields.includes("severity") && (
-                <div>
-                  <label htmlFor="edit-severity" className="block text-sm font-medium">
-                    Severity
-                  </label>
-                  <select id="edit-severity" className="mt-1 rounded border px-2 py-2" {...register("severity")}>
-                    <option value="blocker">blocker</option>
-                    <option value="critical">critical</option>
-                    <option value="major">major</option>
-                    <option value="minor">minor</option>
-                    <option value="trivial">trivial</option>
-                  </select>
-                </div>
-              )}
-              <div className="flex items-center gap-3">
-                <button
-                  type="submit"
-                  disabled={updateMutation.isPending}
-                  className="rounded bg-black px-3 py-2 text-sm text-white disabled:opacity-50"
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
+          <Card>
+            <CardHeader title="Details" />
+            <CardContent>
+              {canEditContent ? (
+                <form
+                  onSubmit={handleSubmit((values) => updateMutation.mutate(values))}
+                  className="space-y-4"
+                  aria-label="Edit bug"
                 >
-                  Save changes
-                </button>
-                {updateMutation.isSuccess && (
-                  <span role="status" className="text-sm text-gray-500">
-                    Saved.
-                  </span>
+                  {bug.editable_fields.includes("title") && (
+                    <FormField htmlFor="edit-title" label="Title" error={errors.title}>
+                      <Input id="edit-title" {...errorProps("edit-title", errors.title)} {...register("title")} />
+                    </FormField>
+                  )}
+                  {bug.editable_fields.includes("description") && (
+                    <FormField htmlFor="edit-description" label="Description" error={errors.description}>
+                      <Textarea id="edit-description" rows={3} {...register("description")} />
+                    </FormField>
+                  )}
+                  {bug.editable_fields.includes("steps_to_reproduce") && (
+                    <FormField htmlFor="edit-steps" label="Steps to reproduce" error={errors.steps_to_reproduce}>
+                      <Textarea id="edit-steps" rows={3} {...register("steps_to_reproduce")} />
+                    </FormField>
+                  )}
+                  {(bug.editable_fields.includes("expected_result") ||
+                    bug.editable_fields.includes("actual_result")) && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {bug.editable_fields.includes("expected_result") && (
+                        <FormField htmlFor="edit-expected" label="Expected result" error={errors.expected_result}>
+                          <Textarea id="edit-expected" rows={2} {...register("expected_result")} />
+                        </FormField>
+                      )}
+                      {bug.editable_fields.includes("actual_result") && (
+                        <FormField htmlFor="edit-actual" label="Actual result" error={errors.actual_result}>
+                          <Textarea id="edit-actual" rows={2} {...register("actual_result")} />
+                        </FormField>
+                      )}
+                    </div>
+                  )}
+                  {bug.editable_fields.includes("environment") && (
+                    <FormField htmlFor="edit-environment" label="Environment" error={errors.environment}>
+                      <Textarea id="edit-environment" rows={2} {...register("environment")} />
+                    </FormField>
+                  )}
+                  {(bug.editable_fields.includes("category") || bug.editable_fields.includes("due_date")) && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {bug.editable_fields.includes("category") && (
+                        <FormField htmlFor="edit-category" label="Category" error={errors.category}>
+                          <Input id="edit-category" {...register("category")} />
+                        </FormField>
+                      )}
+                      {bug.editable_fields.includes("due_date") && (
+                        <FormField htmlFor="edit-due-date" label="Due date" error={errors.due_date}>
+                          <Input id="edit-due-date" type="date" {...register("due_date")} />
+                        </FormField>
+                      )}
+                    </div>
+                  )}
+                  {(bug.editable_fields.includes("priority") || bug.editable_fields.includes("severity")) && (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {bug.editable_fields.includes("priority") && (
+                        <FormField htmlFor="edit-priority" label="Priority" error={errors.priority}>
+                          <Select id="edit-priority" {...register("priority")}>
+                            {BUG_PRIORITIES.map((priority) => (
+                              <option key={priority} value={priority}>
+                                {PRIORITY_LABELS[priority]}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormField>
+                      )}
+                      {bug.editable_fields.includes("severity") && (
+                        <FormField htmlFor="edit-severity" label="Severity" error={errors.severity}>
+                          <Select id="edit-severity" {...register("severity")}>
+                            {BUG_SEVERITIES.map((severity) => (
+                              <option key={severity} value={severity}>
+                                {SEVERITY_LABELS[severity]}
+                              </option>
+                            ))}
+                          </Select>
+                        </FormField>
+                      )}
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3 border-t border-border pt-4">
+                    <Button type="submit" loading={updateMutation.isPending}>
+                      Save changes
+                    </Button>
+                    {updateMutation.isSuccess && (
+                      <span role="status" className="text-sm text-text-secondary">
+                        Saved.
+                      </span>
+                    )}
+                  </div>
+                </form>
+              ) : (
+                <dl className="space-y-4 text-sm">
+                  <div>
+                    <dt className="font-medium text-text-primary">Description</dt>
+                    <dd className="mt-1 whitespace-pre-wrap text-text-secondary">{bug.description || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-text-primary">Steps to reproduce</dt>
+                    <dd className="mt-1 whitespace-pre-wrap text-text-secondary">
+                      {bug.steps_to_reproduce || "—"}
+                    </dd>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <dt className="font-medium text-text-primary">Expected result</dt>
+                      <dd className="mt-1 whitespace-pre-wrap text-text-secondary">
+                        {bug.expected_result || "—"}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="font-medium text-text-primary">Actual result</dt>
+                      <dd className="mt-1 whitespace-pre-wrap text-text-secondary">{bug.actual_result || "—"}</dd>
+                    </div>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-text-primary">Environment</dt>
+                    <dd className="mt-1 whitespace-pre-wrap text-text-secondary">{bug.environment || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt className="font-medium text-text-primary">Category</dt>
+                    <dd className="mt-1 text-text-secondary">{bug.category || "—"}</dd>
+                  </div>
+                </dl>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="Attachments" />
+            <CardContent>
+              <BugAttachments bugId={bug.id} isArchived={isArchived} canUpload={canCollaborate} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="Discussion" />
+            <CardContent>
+              <BugDiscussion bugId={bug.id} isArchived={isArchived} canComment={canCollaborate} />
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="space-y-6">
+          <Card>
+            <CardHeader title="Details" />
+            <CardContent className="space-y-4">
+              {!isArchived && bug.available_transitions.length > 0 && (
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    transitionMutation.mutate();
+                  }}
+                  className="space-y-2 border-b border-border pb-4"
+                >
+                  <FormField htmlFor="transition-target" label="Change status">
+                    <Select
+                      id="transition-target"
+                      value={transitionTarget}
+                      onChange={(event) => setTransitionTarget(event.target.value as BugStatus | "")}
+                    >
+                      <option value="">Select…</option>
+                      {bug.available_transitions.map((status) => (
+                        <option key={status} value={status}>
+                          {formatStatusLabel(status)}
+                        </option>
+                      ))}
+                    </Select>
+                  </FormField>
+                  {transitionTarget === "duplicate" && (
+                    <FormField htmlFor="duplicate-of-key" label="Duplicate of (bug key)">
+                      <Input
+                        id="duplicate-of-key"
+                        value={duplicateOfKey}
+                        onChange={(event) => setDuplicateOfKey(event.target.value)}
+                        placeholder="e.g. BFW-2"
+                      />
+                    </FormField>
+                  )}
+                  <Button
+                    type="submit"
+                    variant="secondary"
+                    size="sm"
+                    disabled={!transitionTarget || transitionMutation.isPending}
+                  >
+                    Apply
+                  </Button>
+                </form>
+              )}
+
+              <div>
+                <p className="text-xs font-medium text-text-secondary">Assignee</p>
+                {bug.can_assign ? (
+                  <form
+                    onSubmit={assignForm.handleSubmit((values) => assignMutation.mutate(values))}
+                    className="mt-1.5 space-y-2"
+                  >
+                    <Select {...assignForm.register("assignee")} aria-label="Assignee">
+                      <option value="">Unassigned</option>
+                      {eligibleAssignees.map((member) => (
+                        <option key={member.id} value={member.user.id}>
+                          {userLabel(member.user)} ({member.user.email})
+                        </option>
+                      ))}
+                    </Select>
+                    <Button type="submit" variant="secondary" size="sm" disabled={assignMutation.isPending}>
+                      Update assignee
+                    </Button>
+                  </form>
+                ) : (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    {bug.assignee ? (
+                      <>
+                        <Avatar user={bug.assignee} size="sm" />
+                        <span className="text-sm text-text-primary">{userLabel(bug.assignee)}</span>
+                      </>
+                    ) : (
+                      <span className="text-sm text-text-secondary">Unassigned</span>
+                    )}
+                  </div>
                 )}
               </div>
-            </form>
-          ) : (
-            <dl className="space-y-2 text-sm">
-              <div>
-                <dt className="font-medium">Description</dt>
-                <dd className="whitespace-pre-wrap">{bug.description || "—"}</dd>
-              </div>
-              <div>
-                <dt className="font-medium">Steps to reproduce</dt>
-                <dd className="whitespace-pre-wrap">{bug.steps_to_reproduce || "—"}</dd>
-              </div>
-              <div>
-                <dt className="font-medium">Category</dt>
-                <dd>{bug.category || "—"}</dd>
-              </div>
-            </dl>
-          )}
-        </section>
-      )}
 
-      {!isArchived && bug.available_transitions.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="font-medium">Change status</h2>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              transitionMutation.mutate();
-            }}
-            className="flex flex-wrap items-end gap-2"
-          >
-            <div>
-              <label htmlFor="transition-target" className="block text-xs font-medium">
-                New status
-              </label>
-              <select
-                id="transition-target"
-                value={transitionTarget}
-                onChange={(event) => setTransitionTarget(event.target.value as BugStatus | "")}
-                className="mt-1 rounded border px-2 py-1 text-sm"
+              <div>
+                <p className="text-xs font-medium text-text-secondary">Reporter</p>
+                <div className="mt-1.5 flex items-center gap-2">
+                  <Avatar user={bug.reporter} size="sm" />
+                  <span className="text-sm text-text-primary">{userLabel(bug.reporter)}</span>
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-text-secondary">Created</p>
+                <p className="mt-1 text-sm text-text-primary">{formatDateTime(bug.created_at)}</p>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-text-secondary">Last updated</p>
+                <p className="mt-1 text-sm text-text-primary">{formatDateTime(bug.updated_at)}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="Project" />
+            <CardContent>
+              <Link
+                href={`/projects/${bug.project.id}`}
+                className="flex items-center gap-2.5 text-sm font-medium text-text-primary hover:text-primary"
               >
-                <option value="">Select…</option>
-                {bug.available_transitions.map((status) => (
-                  <option key={status} value={status}>
-                    {status.replace(/_/g, " ")}
-                  </option>
+                <span className="flex size-8 flex-none items-center justify-center rounded-field bg-primary text-xs font-semibold text-white">
+                  {bug.project.key.slice(0, 2)}
+                </span>
+                {bug.project.name}
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader title="Tags" />
+            <CardContent className="space-y-3">
+              <ul className="flex flex-wrap gap-1.5">
+                {bug.tags.map((tag) => (
+                  <li key={tag.id}>
+                    <Badge tone="neutral" className="gap-1">
+                      {tag.name}
+                      {canEditContent && (
+                        <button
+                          type="button"
+                          onClick={() => removeTagMutation.mutate(tag.id)}
+                          disabled={removeTagMutation.isPending}
+                          className="text-text-secondary hover:text-danger"
+                          aria-label={`Remove tag ${tag.name}`}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </Badge>
+                  </li>
                 ))}
-              </select>
-            </div>
-            {transitionTarget === "duplicate" && (
-              <div>
-                <label htmlFor="duplicate-of-key" className="block text-xs font-medium">
-                  Duplicate of (bug key)
-                </label>
-                <input
-                  id="duplicate-of-key"
-                  value={duplicateOfKey}
-                  onChange={(event) => setDuplicateOfKey(event.target.value)}
-                  placeholder="e.g. BFW-2"
-                  className="mt-1 rounded border px-2 py-1 text-sm"
-                />
-              </div>
-            )}
-            <button
-              type="submit"
-              disabled={!transitionTarget || transitionMutation.isPending}
-              className="rounded border px-3 py-1 text-sm disabled:opacity-50"
-            >
-              Apply
-            </button>
-          </form>
-        </section>
-      )}
-
-      {!isArchived && bug.can_assign && (
-        <section className="space-y-2">
-          <h2 className="font-medium">Assignee</h2>
-          <p className="text-sm text-gray-500" data-testid="current-assignee">
-            Currently assigned to:{" "}
-            {bug.assignee
-              ? `${bug.assignee.first_name} ${bug.assignee.last_name}`.trim() || bug.assignee.email
-              : "Unassigned"}
-          </p>
-          <form
-            onSubmit={assignForm.handleSubmit((values) => assignMutation.mutate(values))}
-            className="flex items-end gap-2"
-          >
-            <select
-              {...assignForm.register("assignee")}
-              className="rounded border px-2 py-1 text-sm"
-              aria-label="Assignee"
-            >
-              <option value="">Unassigned</option>
-              {eligibleAssignees.map((member) => (
-                <option key={member.id} value={member.user.id}>
-                  {member.user.first_name} {member.user.last_name} ({member.user.email})
-                </option>
-              ))}
-            </select>
-            <button
-              type="submit"
-              disabled={assignMutation.isPending}
-              className="rounded border px-3 py-1 text-sm disabled:opacity-50"
-            >
-              Update assignee
-            </button>
-          </form>
-        </section>
-      )}
-
-      <section className="space-y-2">
-        <h2 className="font-medium">Tags</h2>
-        <ul className="flex flex-wrap gap-2">
-          {bug.tags.map((tag) => (
-            <li key={tag.id} className="flex items-center gap-1 rounded border px-2 py-1 text-xs">
-              {tag.name}
-              {canEditContent && !isArchived && (
-                <button
-                  type="button"
-                  onClick={() => removeTagMutation.mutate(tag.id)}
-                  disabled={removeTagMutation.isPending}
-                  className="text-red-700"
-                  aria-label={`Remove tag ${tag.name}`}
+                {bug.tags.length === 0 && <li className="text-sm text-text-secondary">No tags.</li>}
+              </ul>
+              {canEditContent && (
+                <form
+                  onSubmit={tagForm.handleSubmit((values) => addTagMutation.mutate(values))}
+                  className="flex items-end gap-2"
+                  aria-label="Add tag"
                 >
-                  ×
-                </button>
+                  <FormField htmlFor="new-tag-name" label="New tag" error={tagForm.formState.errors.name}>
+                    <Input
+                      id="new-tag-name"
+                      {...errorProps("new-tag-name", tagForm.formState.errors.name)}
+                      {...tagForm.register("name")}
+                    />
+                  </FormField>
+                  <Button type="submit" variant="secondary" size="sm" disabled={addTagMutation.isPending}>
+                    Add
+                  </Button>
+                </form>
               )}
-            </li>
-          ))}
-          {bug.tags.length === 0 && <li className="text-sm text-gray-500">No tags.</li>}
-        </ul>
-        {canEditContent && !isArchived && (
-          <form
-            onSubmit={tagForm.handleSubmit((values) => addTagMutation.mutate(values))}
-            className="flex items-end gap-2"
-            aria-label="Add tag"
-          >
-            <div>
-              <label htmlFor="new-tag-name" className="block text-xs font-medium">
-                New tag
-              </label>
-              <input
-                id="new-tag-name"
-                className="mt-1 rounded border px-2 py-1 text-sm"
-                {...errorProps("new-tag-name", tagForm.formState.errors.name)}
-                {...tagForm.register("name")}
-              />
-              {tagForm.formState.errors.name && (
-                <p id="new-tag-name-error" role="alert" className="mt-1 text-xs text-red-700">
-                  {tagForm.formState.errors.name.message}
-                </p>
-              )}
-            </div>
-            <button
-              type="submit"
-              disabled={addTagMutation.isPending}
-              className="rounded border px-3 py-1 text-sm disabled:opacity-50"
-            >
-              Add
-            </button>
-          </form>
-        )}
-      </section>
+            </CardContent>
+          </Card>
 
-      <section className="flex items-center gap-3">
-        {bug.is_watching ? (
-          <button
-            type="button"
-            onClick={() => unwatchMutation.mutate()}
-            disabled={unwatchMutation.isPending}
-            className="rounded border px-3 py-2 text-sm disabled:opacity-50"
-          >
-            Unwatch
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => watchMutation.mutate()}
-            disabled={watchMutation.isPending}
-            className="rounded border px-3 py-2 text-sm disabled:opacity-50"
-          >
-            Watch
-          </button>
-        )}
-        <span className="text-sm text-gray-500">
-          {bug.watcher_count} watcher{bug.watcher_count === 1 ? "" : "s"}
-        </span>
-      </section>
-
-      {!isArchived && <BugRelationshipsPanel bug={bug} onMutated={onMutated} onError={onMutationError} />}
-
-      {!isArchived && bug.can_archive && (
-        <section className="border-t pt-4">
-          {!confirmingArchive ? (
-            <button
-              ref={archiveButtonRef}
-              type="button"
-              onClick={() => setConfirmingArchive(true)}
-              className="text-sm text-red-700 underline"
-            >
-              Archive bug
-            </button>
-          ) : (
-            <AlertDialog
-              variant="inline"
-              title="Confirm archive bug"
-              description="Archive this bug?"
-              confirmLabel="Confirm"
-              onConfirm={() => archiveMutation.mutate()}
-              onCancel={() => setConfirmingArchive(false)}
-              pending={archiveMutation.isPending}
-              restoreFocusTo={archiveButtonRef}
-            />
+          {!isArchived && (
+            <Card>
+              <CardHeader title="Relationships" />
+              <CardContent>
+                <BugRelationshipsPanel bug={bug} onMutated={onMutated} onError={onMutationError} />
+              </CardContent>
+            </Card>
           )}
-        </section>
-      )}
 
-      <section className="space-y-2 border-t pt-4">
-        <h2 className="font-medium">Attachments</h2>
-        <BugAttachments bugId={bug.id} isArchived={isArchived} canUpload={canCollaborate} />
-      </section>
-
-      <section className="space-y-2 border-t pt-4">
-        <h2 className="font-medium">Discussion</h2>
-        <BugDiscussion bugId={bug.id} isArchived={isArchived} canComment={canCollaborate} />
-      </section>
-
-      <section className="space-y-2 border-t pt-4">
-        <h2 className="font-medium">Activity</h2>
-        <BugActivityFeed bugId={bug.id} />
-      </section>
+          <Card>
+            <CardHeader title="Activity" />
+            <CardContent>
+              <BugActivityFeed bugId={bug.id} />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </main>
   );
 }

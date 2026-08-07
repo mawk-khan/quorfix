@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/cn";
 import type { ActiveProject } from "@/lib/api/types";
 import {
   isExcessiveRange,
@@ -16,6 +20,17 @@ import type {
 } from "@/lib/dashboard/use-dashboard-filters";
 
 const PRESETS: Exclude<DateRangePreset, "custom">[] = ["7d", "30d", "90d"];
+
+// Toggle-button chrome (not the standalone Button component — these need a
+// persistent "selected" look driven by aria-pressed, which Button's variant
+// set doesn't model): same height/radius/focus-ring contract as Button's sm
+// size, so it still reads as one family.
+const TOGGLE_BASE =
+  "inline-flex h-8 items-center justify-center rounded-field border px-3 text-sm font-medium " +
+  "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary " +
+  "focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+const TOGGLE_ACTIVE = "border-primary bg-primary-subtle text-primary";
+const TOGGLE_INACTIVE = "border-border bg-surface text-text-secondary hover:bg-page hover:text-text-primary";
 
 interface DashboardFiltersProps {
   filters: DashboardFiltersValue;
@@ -63,16 +78,14 @@ export function DashboardFilters({ filters, projects, onChange }: DashboardFilte
   return (
     <div className="flex flex-wrap items-end gap-4">
       <fieldset className="flex flex-wrap items-end gap-2">
-        <legend className="mb-1 block text-sm font-medium">Date range</legend>
+        <legend className="mb-1.5 block text-sm font-medium text-text-primary">Date range</legend>
         {PRESETS.map((preset) => (
           <button
             key={preset}
             type="button"
             onClick={() => selectPreset(preset)}
             aria-pressed={filters.range === preset}
-            className={`rounded border px-3 py-1.5 text-sm ${
-              filters.range === preset ? "border-blue-600 bg-blue-50 font-medium text-blue-700" : ""
-            }`}
+            className={cn(TOGGLE_BASE, filters.range === preset ? TOGGLE_ACTIVE : TOGGLE_INACTIVE)}
           >
             {PRESET_LABELS[preset]}
           </button>
@@ -81,9 +94,7 @@ export function DashboardFilters({ filters, projects, onChange }: DashboardFilte
           type="button"
           onClick={selectCustom}
           aria-pressed={filters.range === "custom"}
-          className={`rounded border px-3 py-1.5 text-sm ${
-            filters.range === "custom" ? "border-blue-600 bg-blue-50 font-medium text-blue-700" : ""
-          }`}
+          className={cn(TOGGLE_BASE, filters.range === "custom" ? TOGGLE_ACTIVE : TOGGLE_INACTIVE)}
         >
           Custom
         </button>
@@ -92,44 +103,44 @@ export function DashboardFilters({ filters, projects, onChange }: DashboardFilte
       {filters.range === "custom" && (
         <div className="flex items-end gap-2">
           <div>
-            <label htmlFor="dashboard-date-from" className="block text-sm font-medium">
+            <label htmlFor="dashboard-date-from" className="block text-sm font-medium text-text-primary">
               From
             </label>
-            <input
+            <Input
               id="dashboard-date-from"
               type="date"
               value={draftFrom}
               onChange={(event) => setDraftFrom(event.target.value)}
-              className="mt-1 rounded border px-2 py-1.5 text-sm"
+              className="mt-1.5 h-8"
             />
           </div>
           <div>
-            <label htmlFor="dashboard-date-to" className="block text-sm font-medium">
+            <label htmlFor="dashboard-date-to" className="block text-sm font-medium text-text-primary">
               To
             </label>
-            <input
+            <Input
               id="dashboard-date-to"
               type="date"
               value={draftTo}
               onChange={(event) => setDraftTo(event.target.value)}
-              className="mt-1 rounded border px-2 py-1.5 text-sm"
+              className="mt-1.5 h-8"
             />
           </div>
-          <button type="button" onClick={applyCustomRange} className="rounded border px-3 py-1.5 text-sm">
+          <Button type="button" variant="secondary" size="sm" onClick={applyCustomRange}>
             Apply
-          </button>
+          </Button>
         </div>
       )}
 
       <div>
-        <label htmlFor="dashboard-project-filter" className="block text-sm font-medium">
+        <label htmlFor="dashboard-project-filter" className="block text-sm font-medium text-text-primary">
           Project
         </label>
-        <select
+        <Select
           id="dashboard-project-filter"
           value={filters.project}
           onChange={(event) => onChange({ project: event.target.value })}
-          className="mt-1 rounded border px-2 py-1.5 text-sm"
+          className="mt-1.5 h-8 w-auto"
         >
           <option value="">All projects</option>
           {projects.map((project) => (
@@ -137,11 +148,11 @@ export function DashboardFilters({ filters, projects, onChange }: DashboardFilte
               {project.key}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
 
       {error && (
-        <p role="alert" className="w-full text-sm text-red-700">
+        <p role="alert" className="w-full text-sm text-danger">
           {error}
         </p>
       )}

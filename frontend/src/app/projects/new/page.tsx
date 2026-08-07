@@ -7,6 +7,8 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { AccessState } from "@/components/access-state";
+import { Card, CardContent } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
 import { ApiError } from "@/lib/api/client";
 import { listMembers } from "@/lib/api/members";
 import { createProject } from "@/lib/api/projects";
@@ -98,24 +100,28 @@ export default function NewProjectPage() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl space-y-6 p-8">
-      <h1 className="text-xl font-semibold">New project</h1>
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6 p-8">
+      <PageHeader title="New project" />
 
       {submitError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="rounded-field border border-danger/20 bg-danger-subtle p-3 text-sm text-danger">
           {submitError}
         </p>
       )}
 
-      <ProjectForm
-        mode="create"
-        register={register}
-        errors={errors}
-        onSubmit={handleSubmit((values) => createMutation.mutate(values))}
-        isSubmitting={createMutation.isPending}
-        members={membersQuery.data ?? []}
-        submitLabel="Create project"
-      />
+      <Card>
+        <CardContent>
+          <ProjectForm
+            mode="create"
+            register={register}
+            errors={errors}
+            onSubmit={handleSubmit((values) => createMutation.mutate(values))}
+            isSubmitting={createMutation.isPending}
+            members={membersQuery.data ?? []}
+            submitLabel="Create project"
+          />
+        </CardContent>
+      </Card>
     </main>
   );
 }

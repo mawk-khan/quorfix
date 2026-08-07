@@ -243,13 +243,16 @@ describe("Dashboard (HomePage)", () => {
     renderWithProviders(<HomePage />);
 
     await screen.findByText("Dev User");
-    const statusSection = screen.getByRole("heading", { name: "Bugs by status" }).closest("section")!;
-    expect(within(statusSection).getByText(/not affected by the date range/i)).toBeInTheDocument();
+    // CardHeader wraps a section's <h2> and its muted subtitle <p> together
+    // in one div — closest("div") from the heading lands on exactly that
+    // wrapper, not the whole card (which also holds the chart/table body).
+    const statusHeader = screen.getByRole("heading", { name: "Bugs by status" }).closest("div")!;
+    expect(within(statusHeader).getByText(/not affected by the date range/i)).toBeInTheDocument();
 
-    const workloadSection = screen
+    const workloadHeader = screen
       .getByRole("heading", { name: "Bugs per developer" })
-      .closest("section")!;
-    expect(within(workloadSection).getByText(/not affected by the date range/i)).toBeInTheDocument();
+      .closest("div")!;
+    expect(within(workloadHeader).getByText(/not affected by the date range/i)).toBeInTheDocument();
   });
 
   it("the bug trends chart exposes a text alternative with the same values shown visually", async () => {

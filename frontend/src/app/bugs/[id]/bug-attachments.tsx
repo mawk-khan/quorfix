@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 
+import { Button } from "@/components/ui/button";
 import { attachmentKeys, listAttachments } from "@/lib/api/attachments";
 
 import { AttachmentList } from "./attachment-list";
@@ -26,16 +27,16 @@ export function BugAttachments({ bugId, isArchived, canUpload }: BugAttachmentsP
   const persistedAttachmentIds = useMemo(() => new Set(attachments.map((a) => a.id)), [attachments]);
 
   if (attachmentsQuery.isLoading) {
-    return <p className="text-sm text-gray-500">Loading attachments…</p>;
+    return <p className="text-sm text-text-secondary">Loading attachments…</p>;
   }
 
   if (attachmentsQuery.isError) {
     return (
-      <div role="alert" className="space-y-2 text-sm text-red-700">
+      <div role="alert" className="space-y-2 text-sm text-danger">
         <p>Could not load attachments.</p>
-        <button type="button" onClick={() => attachmentsQuery.refetch()} className="rounded border px-3 py-1 underline">
+        <Button type="button" variant="secondary" size="sm" onClick={() => attachmentsQuery.refetch()}>
           Retry
-        </button>
+        </Button>
       </div>
     );
   }
@@ -55,22 +56,24 @@ export function BugAttachments({ bugId, isArchived, canUpload }: BugAttachmentsP
 
       {attachmentsQuery.data && (attachmentsQuery.data.next || page > 1) && (
         <div className="flex items-center justify-between text-sm">
-          <button
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page <= 1}
-            className="rounded border px-3 py-1 disabled:opacity-50"
           >
             Previous
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="secondary"
+            size="sm"
             onClick={() => setPage((p) => p + 1)}
             disabled={!attachmentsQuery.data.next}
-            className="rounded border px-3 py-1 disabled:opacity-50"
           >
             Next
-          </button>
+          </Button>
         </div>
       )}
     </div>

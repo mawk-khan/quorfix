@@ -40,12 +40,12 @@ export function BugTrendsChart({ query }: BugTrendsChartProps) {
                 dataKey="date"
                 tickFormatter={formatShortDate}
                 stroke={CHART_COLORS.axis}
-                tick={{ fill: CHART_COLORS.textMuted, fontSize: 12 }}
+                tick={{ fill: CHART_COLORS.textSecondary, fontSize: 12 }}
               />
               <YAxis
                 allowDecimals={false}
                 stroke={CHART_COLORS.axis}
-                tick={{ fill: CHART_COLORS.textMuted, fontSize: 12 }}
+                tick={{ fill: CHART_COLORS.textSecondary, fontSize: 12 }}
               />
               <Tooltip
                 labelFormatter={(value) => formatShortDate(String(value))}
@@ -54,6 +54,15 @@ export function BugTrendsChart({ query }: BugTrendsChartProps) {
                   border: `1px solid ${CHART_COLORS.grid}`,
                   fontSize: 12,
                 }}
+                // Recharts defaults each tooltip item's text color to that
+                // series' own mark color (seriesCreated/seriesResolved) —
+                // fine for the CVD-safe pair as a mark color, but the
+                // orange fails WCAG text-contrast against this tooltip's
+                // near-white surface. Pinning both to textPrimary keeps the
+                // marks themselves (line color, legend swatch) using the
+                // validated palette and only recolors this text.
+                itemStyle={{ color: CHART_COLORS.textPrimary }}
+                labelStyle={{ color: CHART_COLORS.textPrimary }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line

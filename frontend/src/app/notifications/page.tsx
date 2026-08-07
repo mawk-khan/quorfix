@@ -5,8 +5,16 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
+import { Bell } from "lucide-react";
+
 import { AccessState } from "@/components/access-state";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api/client";
+import { formatDateTime } from "@/lib/dashboard/format";
 import {
   listNotifications,
   markAllNotificationsRead,
@@ -137,92 +145,107 @@ function NotificationsPageContent() {
   const notifications = notificationsQuery.data?.results ?? [];
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl space-y-6 p-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">Notifications</h1>
-        <div className="flex items-center gap-3">
-          <Link href="/notifications/preferences" className="text-sm text-blue-700 underline">
-            Email preferences
-          </Link>
-          <button
-            type="button"
-            onClick={() => markAllMutation.mutate()}
-            disabled={markAllMutation.isPending}
-            className="rounded border px-3 py-1.5 text-sm disabled:opacity-50"
-          >
-            Mark all read
-          </button>
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-4xl space-y-6 p-8">
+      <PageHeader
+        title="Notifications"
+        action={
+          <div className="flex items-center gap-3">
+            <Link
+              href="/notifications/preferences"
+              className="text-sm font-medium text-primary underline"
+            >
+              Email preferences
+            </Link>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => markAllMutation.mutate()}
+              disabled={markAllMutation.isPending}
+            >
+              Mark all read
+            </Button>
+          </div>
+        }
+      />
+
+      <Card>
+        <div className="border-b border-border p-5">
+          <NotificationFilters value={filters} onChange={(next) => updateParams(next)} />
         </div>
-      </div>
 
-      <NotificationFilters value={filters} onChange={(next) => updateParams(next)} />
+        {notificationsQuery.isLoading && (
+          <div className="p-5">
+            <Skeleton className="h-64" />
+          </div>
+        )}
 
-      {notificationsQuery.isLoading && <p>Loading…</p>}
+        {notificationsQuery.isError && (
+          <div className="p-5">
+            <p role="alert" className="text-sm text-danger">
+              {describeError(notificationsQuery.error)}
+            </p>
+          </div>
+        )}
 
-      {notificationsQuery.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {describeError(notificationsQuery.error)}
-        </p>
-      )}
+        {notificationsQuery.data && notifications.length === 0 && (
+          <EmptyState icon={Bell} title="No notifications match these filters" />
+        )}
 
-      {notificationsQuery.data && notifications.length === 0 && (
-        <p className="text-sm text-gray-500">No notifications match these filters.</p>
-      )}
-
-      {notificationsQuery.data && notifications.length > 0 && (
-        <>
-          <ul className="divide-y rounded border">
-            {notifications.map((notification) => {
-              const isUnread = !notification.read_at;
-              return (
-                <li key={notification.id} className={isUnread ? "bg-blue-50" : ""}>
-                  <div className="flex items-center justify-between gap-3 px-4 py-3">
-                    <Link
-                      href={notification.target_url}
-                      className="flex-1 text-sm"
-                      onClick={() => {
-                        if (isUnread) markReadMutation.mutate(notification.id);
-                      }}
-                    >
-                      <span className={isUnread ? "font-semibold" : ""}>
-                        {isUnread && (
-                          <span
-                            aria-hidden="true"
-                            className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-700"
-                          />
-                        )}
-                        {notificationActorLabel(notification.actor)}{" "}
-                        {NOTIFICATION_EVENT_LABELS[notification.event_type]}
-                        {isUnread && <span className="sr-only"> (unread)</span>}
-                      </span>
-                      <span className="block text-xs text-gray-500">
-                        {notification.bug.key} — {notification.bug.title}
-                      </span>
-                      <span className="block text-xs text-gray-500">
-                        {new Date(notification.created_at).toLocaleString()}
-                      </span>
-                    </Link>
-                    {isUnread && (
-                      <button
-                        type="button"
-                        onClick={() => markReadMutation.mutate(notification.id)}
-                        className="shrink-0 text-xs text-blue-700 underline"
+        {notificationsQuery.data && notifications.length > 0 && (
+          <>
+            <ul className="divide-y divide-border">
+              {notifications.map((notification) => {
+                const isUnread = !notification.read_at;
+                return (
+                  <li key={notification.id} className={isUnread ? "bg-primary-subtle/40" : ""}>
+                    <div className="flex items-center justify-between gap-3 px-5 py-3">
+                      <Link
+                        href={notification.target_url}
+                        className="min-w-0 flex-1 text-sm"
+                        onClick={() => {
+                          if (isUnread) markReadMutation.mutate(notification.id);
+                        }}
                       >
-                        Mark read
-                      </button>
-                    )}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <PaginationControls
-            count={notificationsQuery.data.count}
-            currentPage={page}
-            onPageChange={(nextPage) => updateParams({ page: nextPage })}
-          />
-        </>
-      )}
+                        <span className={isUnread ? "font-semibold text-text-primary" : "text-text-primary"}>
+                          {isUnread && (
+                            <span aria-hidden="true" className="mr-1.5 inline-block size-1.5 rounded-full bg-primary" />
+                          )}
+                          {notificationActorLabel(notification.actor)}{" "}
+                          {NOTIFICATION_EVENT_LABELS[notification.event_type]}
+                          {isUnread && <span className="sr-only"> (unread)</span>}
+                        </span>
+                        <span className="block text-xs text-text-secondary">
+                          {notification.bug.key} — {notification.bug.title}
+                        </span>
+                        <span className="block text-xs text-text-secondary">
+                          {formatDateTime(notification.created_at)}
+                        </span>
+                      </Link>
+                      {isUnread && (
+                        <button
+                          type="button"
+                          onClick={() => markReadMutation.mutate(notification.id)}
+                          className="shrink-0 text-xs font-medium text-primary underline"
+                        >
+                          Mark read
+                        </button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="border-t border-border p-4">
+              <PaginationControls
+                count={notificationsQuery.data.count}
+                currentPage={page}
+                onPageChange={(nextPage) => updateParams({ page: nextPage })}
+              />
+            </div>
+          </>
+        )}
+      </Card>
     </main>
   );
 }

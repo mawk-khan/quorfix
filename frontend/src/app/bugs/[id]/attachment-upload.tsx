@@ -1,7 +1,9 @@
 "use client";
 
+import { UploadCloud } from "lucide-react";
 import { useId, useRef, useState } from "react";
 
+import { cn } from "@/lib/cn";
 import { ApiError } from "@/lib/api/client";
 import {
   ALLOWED_ATTACHMENT_CONTENT_TYPES,
@@ -142,11 +144,15 @@ export function AttachmentUpload({ bugId, disabled, disabledReason, persistedAtt
   }
 
   if (disabled) {
-    return <p className="text-sm text-gray-500">{disabledReason ?? "Uploads are not available for this bug."}</p>;
+    return (
+      <p className="text-sm text-text-secondary">
+        {disabledReason ?? "Uploads are not available for this bug."}
+      </p>
+    );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div
         onDragOver={(event) => {
           event.preventDefault();
@@ -158,16 +164,22 @@ export function AttachmentUpload({ bugId, disabled, disabledReason, persistedAtt
           setDragOver(false);
           enqueueFiles(event.dataTransfer.files);
         }}
-        className={`rounded border-2 border-dashed p-4 text-center text-sm ${dragOver ? "border-blue-500 bg-blue-50" : "border-gray-300"}`}
+        className={cn(
+          "rounded-card border-2 border-dashed p-6 text-center text-sm transition-colors",
+          dragOver ? "border-primary bg-primary-subtle" : "border-border-strong",
+        )}
       >
-        <p className="text-gray-600">Drag and drop a file here, or</p>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="mt-1 rounded border px-3 py-1 text-sm"
-        >
-          Choose file
-        </button>
+        <UploadCloud aria-hidden="true" className="mx-auto size-6 text-text-muted" />
+        <p className="mt-2 text-text-secondary">
+          Drag and drop a file here, or{" "}
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            className="font-medium text-primary underline"
+          >
+            browse
+          </button>
+        </p>
         <input
           ref={inputRef}
           type="file"
@@ -179,17 +191,21 @@ export function AttachmentUpload({ bugId, disabled, disabledReason, persistedAtt
             event.target.value = "";
           }}
         />
-        <p id={acceptedTypesId} className="mt-1 text-xs text-gray-500">
+        <p id={acceptedTypesId} className="mt-2 text-xs text-text-secondary">
           Images, PDF, text/CSV, JSON, ZIP, MP4, Word/Excel. Max 10 MB. SVG is not accepted.
         </p>
       </div>
 
       {visibleRows.length > 0 && (
-        <ul className="space-y-1">
+        <ul className="space-y-1.5">
           {visibleRows.map((row) => (
-            <li key={row.localId} className="flex items-center gap-2 rounded border px-3 py-2 text-sm" data-testid="upload-row">
-              <span className="flex-1 truncate">{row.file.name}</span>
-              <span className="text-xs text-gray-500">{formatFileSize(row.file.size)}</span>
+            <li
+              key={row.localId}
+              className="flex items-center gap-2 rounded-field border border-border px-3 py-2 text-sm"
+              data-testid="upload-row"
+            >
+              <span className="flex-1 truncate text-text-primary">{row.file.name}</span>
+              <span className="text-xs text-text-secondary">{formatFileSize(row.file.size)}</span>
               {row.status === "uploading" && (
                 <span
                   role="progressbar"
@@ -197,22 +213,26 @@ export function AttachmentUpload({ bugId, disabled, disabledReason, persistedAtt
                   aria-valuemax={100}
                   aria-valuenow={Math.round(row.progress * 100)}
                   aria-label={`Uploading ${row.file.name}`}
-                  className="text-xs text-gray-500"
+                  className="text-xs text-text-secondary"
                 >
                   Uploading… {Math.round(row.progress * 100)}%
                 </span>
               )}
               {row.status === "success" && (
-                <span role="status" className="text-xs text-green-700">
+                <span role="status" className="text-xs text-success">
                   Uploaded
                 </span>
               )}
               {row.status === "failed" && (
                 <>
-                  <span role="alert" className="text-xs text-red-700">
+                  <span role="alert" className="text-xs text-danger">
                     {row.error ?? "Upload failed."}
                   </span>
-                  <button type="button" onClick={() => retryRow(row.localId)} className="text-xs text-blue-700 underline">
+                  <button
+                    type="button"
+                    onClick={() => retryRow(row.localId)}
+                    className="text-xs font-medium text-primary underline"
+                  >
                     Retry
                   </button>
                 </>

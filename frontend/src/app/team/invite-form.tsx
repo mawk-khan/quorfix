@@ -3,9 +3,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 
+import { Button } from "@/components/ui/button";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import type { CommunityRole } from "@/lib/api/types";
 import { errorProps } from "@/lib/forms/error-props";
 import { inviteMemberSchema, type InviteMemberFormValues } from "@/lib/validation/invitations";
+
+import { ROLE_LABELS } from "./role-labels";
 
 const ROLES: CommunityRole[] = ["administrator", "developer", "qa", "reporter", "viewer"];
 
@@ -28,46 +34,30 @@ export function InviteForm({ onSubmit, isSubmitting }: InviteFormProps) {
         onSubmit(values);
         reset();
       })}
-      className="mt-4 flex flex-wrap items-end gap-2"
+      className="flex flex-wrap items-end gap-3"
       aria-label="Invite a member"
     >
-      <div>
-        <label htmlFor="invite-email" className="block text-sm font-medium">
-          Email
-        </label>
-        <input
+      <FormField htmlFor="invite-email" label="Email" error={errors.email}>
+        <Input
           id="invite-email"
           type="email"
           autoComplete="email"
-          className="mt-1 rounded border px-3 py-2"
           {...errorProps("invite-email", errors.email)}
           {...register("email")}
         />
-        {errors.email && (
-          <p id="invite-email-error" role="alert" className="mt-1 text-sm text-red-700">
-            {errors.email.message}
-          </p>
-        )}
-      </div>
-      <div>
-        <label htmlFor="invite-role" className="block text-sm font-medium">
-          Role
-        </label>
-        <select id="invite-role" className="mt-1 rounded border px-2 py-2" {...register("role")}>
+      </FormField>
+      <FormField htmlFor="invite-role" label="Role">
+        <Select id="invite-role" className="w-40" {...register("role")}>
           {ROLES.map((role) => (
             <option key={role} value={role}>
-              {role}
+              {ROLE_LABELS[role]}
             </option>
           ))}
-        </select>
-      </div>
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-      >
+        </Select>
+      </FormField>
+      <Button type="submit" loading={isSubmitting}>
         Invite
-      </button>
+      </Button>
     </form>
   );
 }

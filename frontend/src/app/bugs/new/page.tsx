@@ -2,11 +2,18 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { AccessState } from "@/components/access-state";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
+import { Input, Textarea } from "@/components/ui/input";
+import { PageHeader } from "@/components/ui/page-header";
+import { Select } from "@/components/ui/select";
 import { createBug } from "@/lib/api/bugs";
 import { ApiError } from "@/lib/api/client";
 import { listProjects } from "@/lib/api/projects";
@@ -14,6 +21,8 @@ import { useSession } from "@/lib/auth/session-provider";
 import { errorProps } from "@/lib/forms/error-props";
 import { usePageTitle } from "@/lib/use-page-title";
 import { BUG_PRIORITIES, BUG_SEVERITIES, createBugSchema, type CreateBugFormValues } from "@/lib/validation/bugs";
+
+import { PRIORITY_LABELS, SEVERITY_LABELS } from "../bug-badges";
 
 function describeError(error: unknown): string {
   if (error instanceof ApiError && typeof error.body === "object" && error.body !== null) {
@@ -101,188 +110,115 @@ export default function NewBugPage() {
   const projects = projectsQuery.data?.results ?? [];
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-xl space-y-6 p-8">
-      <h1 className="text-xl font-semibold">New bug</h1>
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-2xl space-y-6 p-8">
+      <PageHeader
+        title="New bug"
+        description="Report a new bug with detailed information for proper tracking."
+      />
 
       {submitError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="rounded-field border border-danger/20 bg-danger-subtle p-3 text-sm text-danger">
           {submitError}
         </p>
       )}
 
-      <form
-        onSubmit={handleSubmit((values) => createMutation.mutate(values))}
-        className="space-y-4"
-        aria-label="Create bug"
-      >
-        <div>
-          <label htmlFor="bug-project" className="block text-sm font-medium">
-            Project
-          </label>
-          <select
-            id="bug-project"
-            className="mt-1 w-full rounded border px-2 py-2"
-            {...errorProps("bug-project", errors.project)}
-            {...register("project")}
+      <Card>
+        <CardContent>
+          <form
+            onSubmit={handleSubmit((values) => createMutation.mutate(values))}
+            className="space-y-4"
+            aria-label="Create bug"
           >
-            <option value="">Select a project…</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.key} — {project.name}
-              </option>
-            ))}
-          </select>
-          {errors.project && (
-            <p id="bug-project-error" role="alert" className="mt-1 text-sm text-red-700">
-              {errors.project.message}
-            </p>
-          )}
-        </div>
+            <FormField htmlFor="bug-project" label="Project" required error={errors.project}>
+              <Select
+                id="bug-project"
+                {...errorProps("bug-project", errors.project)}
+                {...register("project")}
+              >
+                <option value="">Select a project…</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.key} — {project.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
 
-        <div>
-          <label htmlFor="bug-title" className="block text-sm font-medium">
-            Title
-          </label>
-          <input
-            id="bug-title"
-            className="mt-1 w-full rounded border px-3 py-2"
-            {...errorProps("bug-title", errors.title)}
-            {...register("title")}
-          />
-          {errors.title && (
-            <p id="bug-title-error" role="alert" className="mt-1 text-sm text-red-700">
-              {errors.title.message}
-            </p>
-          )}
-        </div>
+            <FormField htmlFor="bug-title" label="Title" required error={errors.title}>
+              <Input
+                id="bug-title"
+                {...errorProps("bug-title", errors.title)}
+                {...register("title")}
+              />
+            </FormField>
 
-        <div>
-          <label htmlFor="bug-description" className="block text-sm font-medium">
-            Description
-          </label>
-          <textarea
-            id="bug-description"
-            rows={3}
-            className="mt-1 w-full rounded border px-3 py-2"
-            {...register("description")}
-          />
-        </div>
+            <FormField htmlFor="bug-description" label="Description" error={errors.description}>
+              <Textarea id="bug-description" rows={3} {...register("description")} />
+            </FormField>
 
-        <div>
-          <label htmlFor="bug-steps" className="block text-sm font-medium">
-            Steps to reproduce
-          </label>
-          <textarea
-            id="bug-steps"
-            rows={3}
-            className="mt-1 w-full rounded border px-3 py-2"
-            {...register("steps_to_reproduce")}
-          />
-        </div>
+            <FormField htmlFor="bug-steps" label="Steps to reproduce" error={errors.steps_to_reproduce}>
+              <Textarea id="bug-steps" rows={3} {...register("steps_to_reproduce")} />
+            </FormField>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label htmlFor="bug-expected" className="block text-sm font-medium">
-              Expected result
-            </label>
-            <textarea
-              id="bug-expected"
-              rows={2}
-              className="mt-1 w-full rounded border px-3 py-2"
-              {...register("expected_result")}
-            />
-          </div>
-          <div>
-            <label htmlFor="bug-actual" className="block text-sm font-medium">
-              Actual result
-            </label>
-            <textarea
-              id="bug-actual"
-              rows={2}
-              className="mt-1 w-full rounded border px-3 py-2"
-              {...register("actual_result")}
-            />
-          </div>
-        </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField htmlFor="bug-expected" label="Expected result" error={errors.expected_result}>
+                <Textarea id="bug-expected" rows={2} {...register("expected_result")} />
+              </FormField>
+              <FormField htmlFor="bug-actual" label="Actual result" error={errors.actual_result}>
+                <Textarea id="bug-actual" rows={2} {...register("actual_result")} />
+              </FormField>
+            </div>
 
-        <div>
-          <label htmlFor="bug-environment" className="block text-sm font-medium">
-            Environment
-          </label>
-          <textarea
-            id="bug-environment"
-            rows={2}
-            className="mt-1 w-full rounded border px-3 py-2"
-            placeholder="Browser, OS, app version…"
-            {...register("environment")}
-          />
-        </div>
+            <FormField htmlFor="bug-environment" label="Environment" error={errors.environment}>
+              <Textarea
+                id="bug-environment"
+                rows={2}
+                placeholder="Browser, OS, app version…"
+                {...register("environment")}
+              />
+            </FormField>
 
-        <div className="grid grid-cols-3 gap-3">
-          <div>
-            <label htmlFor="bug-category" className="block text-sm font-medium">
-              Category
-            </label>
-            <input
-              id="bug-category"
-              className="mt-1 w-full rounded border px-3 py-2"
-              {...register("category")}
-            />
-          </div>
-          <div>
-            <label htmlFor="bug-priority" className="block text-sm font-medium">
-              Priority
-            </label>
-            <select
-              id="bug-priority"
-              className="mt-1 w-full rounded border px-2 py-2"
-              {...register("priority")}
-            >
-              {BUG_PRIORITIES.map((priority) => (
-                <option key={priority} value={priority}>
-                  {priority}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="bug-severity" className="block text-sm font-medium">
-              Severity
-            </label>
-            <select
-              id="bug-severity"
-              className="mt-1 w-full rounded border px-2 py-2"
-              {...register("severity")}
-            >
-              {BUG_SEVERITIES.map((severity) => (
-                <option key={severity} value={severity}>
-                  {severity}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField htmlFor="bug-category" label="Category" error={errors.category}>
+                <Input id="bug-category" {...register("category")} />
+              </FormField>
+              <FormField htmlFor="bug-due-date" label="Due date" error={errors.due_date}>
+                <Input id="bug-due-date" type="date" {...register("due_date")} />
+              </FormField>
+            </div>
 
-        <div>
-          <label htmlFor="bug-due-date" className="block text-sm font-medium">
-            Due date
-          </label>
-          <input
-            id="bug-due-date"
-            type="date"
-            className="mt-1 rounded border px-3 py-2"
-            {...register("due_date")}
-          />
-        </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FormField htmlFor="bug-priority" label="Priority" error={errors.priority}>
+                <Select id="bug-priority" {...register("priority")}>
+                  {BUG_PRIORITIES.map((priority) => (
+                    <option key={priority} value={priority}>
+                      {PRIORITY_LABELS[priority]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+              <FormField htmlFor="bug-severity" label="Severity" error={errors.severity}>
+                <Select id="bug-severity" {...register("severity")}>
+                  {BUG_SEVERITIES.map((severity) => (
+                    <option key={severity} value={severity}>
+                      {SEVERITY_LABELS[severity]}
+                    </option>
+                  ))}
+                </Select>
+              </FormField>
+            </div>
 
-        <button
-          type="submit"
-          disabled={createMutation.isPending}
-          className="rounded bg-black px-3 py-2 text-white disabled:opacity-50"
-        >
-          Create bug
-        </button>
-      </form>
+            <div className="flex items-center justify-end gap-3 border-t border-border pt-4">
+              <Link href="/bugs" className={buttonVariants("secondary", "md")}>
+                Cancel
+              </Link>
+              <Button type="submit" loading={createMutation.isPending}>
+                Create bug
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </main>
   );
 }

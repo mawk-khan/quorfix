@@ -6,6 +6,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
 import { AccessState } from "@/components/access-state";
+import { buttonVariants } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { listBugs } from "@/lib/api/bugs";
 import { ApiError } from "@/lib/api/client";
 import { listProjects } from "@/lib/api/projects";
@@ -157,40 +161,57 @@ function BugsPageContent() {
     filters.unassigned;
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-5xl space-y-6 p-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">Bugs</h1>
-        {canCreate && (
-          <Link href="/bugs/new" className="rounded bg-black px-3 py-2 text-sm text-white">
-            New bug
-          </Link>
-        )}
-      </div>
-
-      <BugFilters
-        value={filters}
-        projects={projectsQuery.data?.results ?? []}
-        onChange={(next) => updateParams(next)}
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-6xl space-y-6 p-8">
+      <PageHeader
+        title="Bugs"
+        description="Track, triage, and resolve issues across all projects."
+        action={
+          canCreate && (
+            <Link href="/bugs/new" className={buttonVariants("primary", "md")}>
+              New bug
+            </Link>
+          )
+        }
       />
 
-      {bugsQuery.isLoading && <p>Loading…</p>}
-
-      {bugsQuery.isError && (
-        <p role="alert" className="text-sm text-red-700">
-          {describeError(bugsQuery.error)}
-        </p>
-      )}
-
-      {bugsQuery.data && (
-        <>
-          <BugTable bugs={bugsQuery.data.results} hasActiveFilters={hasActiveFilters} />
-          <PaginationControls
-            count={bugsQuery.data.count}
-            currentPage={page}
-            onPageChange={(nextPage) => updateParams({ page: nextPage })}
+      <Card>
+        <div className="border-b border-border p-5">
+          <BugFilters
+            value={filters}
+            projects={projectsQuery.data?.results ?? []}
+            onChange={(next) => updateParams(next)}
           />
-        </>
-      )}
+        </div>
+
+        {bugsQuery.isLoading && (
+          <div className="p-5">
+            <Skeleton className="h-64" />
+          </div>
+        )}
+
+        {bugsQuery.isError && (
+          <div className="p-5">
+            <p role="alert" className="text-sm text-danger">
+              {describeError(bugsQuery.error)}
+            </p>
+          </div>
+        )}
+
+        {bugsQuery.data && (
+          <>
+            <BugTable bugs={bugsQuery.data.results} hasActiveFilters={hasActiveFilters} />
+            {bugsQuery.data.results.length > 0 && (
+              <div className="border-t border-border p-4">
+                <PaginationControls
+                  count={bugsQuery.data.count}
+                  currentPage={page}
+                  onPageChange={(nextPage) => updateParams({ page: nextPage })}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </Card>
     </main>
   );
 }

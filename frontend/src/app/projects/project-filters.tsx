@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchInput } from "@/components/ui/search-input";
+import { Select } from "@/components/ui/select";
 import type { ArchivedFilter } from "@/lib/api/types";
 
 interface ProjectFiltersProps {
@@ -16,34 +18,33 @@ export function ProjectFilters({
   onArchivedChange,
 }: ProjectFiltersProps) {
   return (
-    <div className="flex flex-wrap items-end gap-3">
-      <div>
-        <label htmlFor="project-search" className="block text-sm font-medium">
+    <div className="flex flex-wrap items-end gap-4">
+      <div className="min-w-48 flex-1">
+        <label htmlFor="project-search" className="block text-sm font-medium text-text-primary">
           Search
         </label>
-        <input
+        <SearchInput
           id="project-search"
-          type="search"
           value={search}
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Name or key"
-          className="mt-1 rounded border px-3 py-2"
+          className="mt-1.5"
         />
       </div>
       <div>
-        <label htmlFor="project-archived-filter" className="block text-sm font-medium">
+        <label htmlFor="project-archived-filter" className="block text-sm font-medium text-text-primary">
           Status
         </label>
-        <select
+        <Select
           id="project-archived-filter"
           value={archived}
           onChange={(event) => onArchivedChange(event.target.value as ArchivedFilter)}
-          className="mt-1 rounded border px-2 py-2"
+          className="mt-1.5 w-32"
         >
           <option value="false">Active</option>
           <option value="true">Archived</option>
           <option value="all">All</option>
-        </select>
+        </Select>
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { Badge, type BadgeTone } from "@/components/ui/badge";
 import type { BugPriority, BugSeverity, BugStatus } from "@/lib/api/types";
 
 // Status is never communicated by color alone — every badge below pairs a
@@ -5,7 +6,7 @@ import type { BugPriority, BugSeverity, BugStatus } from "@/lib/api/types";
 // colorblind users and in any context where color is stripped (print,
 // high-contrast mode, screen readers already get the text either way).
 
-const STATUS_LABELS: Record<BugStatus, string> = {
+export const STATUS_LABELS: Record<BugStatus, string> = {
   new: "New",
   triaged: "Triaged",
   assigned: "Assigned",
@@ -21,30 +22,45 @@ const STATUS_LABELS: Record<BugStatus, string> = {
   deferred: "Deferred",
 };
 
+const STATUS_TONES: Record<BugStatus, BadgeTone> = {
+  new: "neutral",
+  triaged: "blue",
+  assigned: "indigo",
+  in_progress: "blue",
+  ready_for_qa: "violet",
+  resolved: "green",
+  reopened: "amber",
+  blocked: "red",
+  closed: "neutral",
+  duplicate: "purple",
+  cannot_reproduce: "neutral",
+  wont_fix: "neutral",
+  deferred: "neutral",
+};
+
 export function StatusBadge({ status }: { status: BugStatus }) {
-  return (
-    <span className="inline-block rounded border px-2 py-0.5 text-xs font-medium">
-      {STATUS_LABELS[status]}
-    </span>
-  );
+  return <Badge tone={STATUS_TONES[status]}>{STATUS_LABELS[status]}</Badge>;
 }
 
-const PRIORITY_LABELS: Record<BugPriority, string> = {
+export const PRIORITY_LABELS: Record<BugPriority, string> = {
   urgent: "Urgent",
   high: "High",
   medium: "Medium",
   low: "Low",
 };
 
+const PRIORITY_TONES: Record<BugPriority, BadgeTone> = {
+  urgent: "red",
+  high: "orange",
+  medium: "amber",
+  low: "neutral",
+};
+
 export function PriorityBadge({ priority }: { priority: BugPriority }) {
-  return (
-    <span className="inline-block rounded border px-2 py-0.5 text-xs font-medium">
-      {PRIORITY_LABELS[priority]} priority
-    </span>
-  );
+  return <Badge tone={PRIORITY_TONES[priority]}>{PRIORITY_LABELS[priority]} priority</Badge>;
 }
 
-const SEVERITY_LABELS: Record<BugSeverity, string> = {
+export const SEVERITY_LABELS: Record<BugSeverity, string> = {
   blocker: "Blocker",
   critical: "Critical",
   major: "Major",
@@ -52,10 +68,14 @@ const SEVERITY_LABELS: Record<BugSeverity, string> = {
   trivial: "Trivial",
 };
 
+const SEVERITY_TONES: Record<BugSeverity, BadgeTone> = {
+  blocker: "red",
+  critical: "rose",
+  major: "purple",
+  minor: "blue",
+  trivial: "neutral",
+};
+
 export function SeverityBadge({ severity }: { severity: BugSeverity }) {
-  return (
-    <span className="inline-block rounded border px-2 py-0.5 text-xs font-medium">
-      {SEVERITY_LABELS[severity]}
-    </span>
-  );
+  return <Badge tone={SEVERITY_TONES[severity]}>{SEVERITY_LABELS[severity]}</Badge>;
 }

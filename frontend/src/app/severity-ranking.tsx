@@ -18,6 +18,7 @@ export function SeverityRanking({ query }: SeverityRankingProps) {
   return (
     <DashboardSection
       title="Bugs by severity"
+      subtitle="Current backlog, ranked blocker to trivial — not affected by the date range"
       query={query}
       isEmpty={(data) => data.severity.every((row) => row.count === 0)}
       emptyMessage="No bugs in the current backlog."
@@ -32,9 +33,6 @@ export function SeverityRanking({ query }: SeverityRankingProps) {
 
         return (
           <div aria-label="Current backlog, ranked from most to least severe — a current snapshot, unaffected by the date filter">
-            <p className="mb-2 text-xs text-gray-500">
-              Current backlog, ranked blocker to trivial — not affected by the date range
-            </p>
             <ResponsiveContainer width="100%" height={Math.max(180, rows.length * 36)}>
               <BarChart
                 data={rows}
@@ -46,14 +44,14 @@ export function SeverityRanking({ query }: SeverityRankingProps) {
                   type="number"
                   allowDecimals={false}
                   stroke={CHART_COLORS.axis}
-                  tick={{ fill: CHART_COLORS.textMuted, fontSize: 12 }}
+                  tick={{ fill: CHART_COLORS.textSecondary, fontSize: 12 }}
                 />
                 <YAxis
                   type="category"
                   dataKey="label"
                   width={80}
                   stroke={CHART_COLORS.axis}
-                  tick={{ fill: CHART_COLORS.textMuted, fontSize: 12 }}
+                  tick={{ fill: CHART_COLORS.textSecondary, fontSize: 12 }}
                 />
                 <Tooltip
                   formatter={(value) => [formatCount(Number(value)), "Bugs"]}
@@ -62,6 +60,8 @@ export function SeverityRanking({ query }: SeverityRankingProps) {
                     border: `1px solid ${CHART_COLORS.grid}`,
                     fontSize: 12,
                   }}
+                  itemStyle={{ color: CHART_COLORS.textPrimary }}
+                  labelStyle={{ color: CHART_COLORS.textPrimary }}
                 />
                 <Bar
                   dataKey="count"

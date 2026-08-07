@@ -3,10 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 
 import { AlertDialog } from "@/components/alert-dialog";
+import { Avatar } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { deleteComment, redactComment, updateComment } from "@/lib/api/comments";
 import { ApiError } from "@/lib/api/client";
 import type { Comment, Membership } from "@/lib/api/types";
 import { renderCommentBody } from "@/lib/comments/render-mentions";
+import { formatDateTime } from "@/lib/dashboard/format";
 import { MAX_COMMENT_BODY_LENGTH } from "@/lib/validation/comments";
 
 import { MentionTextarea } from "./mention-textarea";
@@ -14,13 +17,6 @@ import { MentionTextarea } from "./mention-textarea";
 function actorLabel(user: { first_name: string; last_name: string; email: string }): string {
   const fullName = `${user.first_name} ${user.last_name}`.trim();
   return fullName || user.email;
-}
-
-function initials(user: { first_name: string; last_name: string; email: string }): string {
-  const first = user.first_name.trim()[0];
-  const last = user.last_name.trim()[0];
-  if (first || last) return `${first ?? ""}${last ?? ""}`.toUpperCase();
-  return user.email[0]?.toUpperCase() ?? "?";
 }
 
 function describeError(error: unknown): string {
@@ -150,29 +146,26 @@ export function CommentItem({ bugId, comment, members, onMutated, onStaleState }
   const isRemoved = comment.status !== "active";
 
   return (
-    <li className="border-t pt-3" data-testid="comment-item">
+    <li className="py-3 first:pt-0" data-testid="comment-item">
       <div className="flex items-start gap-3">
-        <span
-          aria-hidden="true"
-          className="flex h-8 w-8 flex-none items-center justify-center rounded-full bg-gray-200 text-xs font-semibold text-gray-700"
-        >
-          {initials(comment.author)}
-        </span>
+        <Avatar user={comment.author} size="md" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-baseline gap-2">
-            <span className="font-medium">{actorLabel(comment.author)}</span>
-            <span className="text-xs text-gray-500">{new Date(comment.created_at).toLocaleString()}</span>
-            {comment.edited_at && !isRemoved && <span className="text-xs text-gray-500">(edited)</span>}
+            <span className="font-medium text-text-primary">{actorLabel(comment.author)}</span>
+            <span className="text-xs text-text-secondary">{formatDateTime(comment.created_at)}</span>
+            {comment.edited_at && !isRemoved && (
+              <span className="text-xs text-text-secondary">(edited)</span>
+            )}
           </div>
 
           {actionError && (
-            <p role="alert" className="mt-1 text-sm text-red-700">
+            <p role="alert" className="mt-1 text-sm text-danger">
               {actionError}
             </p>
           )}
 
           {isRemoved ? (
-            <p className="mt-1 text-sm italic text-gray-500" data-testid="comment-placeholder">
+            <p className="mt-1 text-sm italic text-text-secondary" data-testid="comment-placeholder">
               {comment.status === "deleted"
                 ? "This comment was deleted."
                 : "This comment was redacted by an administrator."}
@@ -188,21 +181,23 @@ export function CommentItem({ bugId, comment, members, onMutated, onStaleState }
                 aria-label="Edit comment"
               />
               <div className="flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   onClick={submitEdit}
                   disabled={pendingAction === "edit" || !editValue.trim()}
-                  className="rounded bg-black px-3 py-1 text-sm text-white disabled:opacity-50"
                 >
                   Save
-                </button>
-                <button type="button" onClick={cancelEditing} className="text-sm underline">
+                </Button>
+                <button type="button" onClick={cancelEditing} className="text-sm text-text-secondary underline">
                   Cancel
                 </button>
               </div>
             </div>
           ) : (
-            <p className="mt-1 whitespace-pre-wrap text-sm">{renderCommentBody(comment.body)}</p>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-text-primary">
+              {renderCommentBody(comment.body)}
+            </p>
           )}
 
           {!isRemoved && !editing && (comment.can_edit || comment.can_delete || comment.can_redact) && (
@@ -212,7 +207,7 @@ export function CommentItem({ bugId, comment, members, onMutated, onStaleState }
                   ref={editButtonRef}
                   type="button"
                   onClick={startEditing}
-                  className="text-blue-700 underline"
+                  className="font-medium text-primary underline"
                 >
                   Edit
                 </button>
@@ -222,7 +217,7 @@ export function CommentItem({ bugId, comment, members, onMutated, onStaleState }
                   ref={deleteButtonRef}
                   type="button"
                   onClick={() => setConfirmingDelete(true)}
-                  className="text-red-700 underline"
+                  className="font-medium text-danger underline"
                 >
                   Delete
                 </button>
@@ -232,7 +227,7 @@ export function CommentItem({ bugId, comment, members, onMutated, onStaleState }
                   ref={redactButtonRef}
                   type="button"
                   onClick={() => setConfirmingRedact(true)}
-                  className="text-red-700 underline"
+                  className="font-medium text-danger underline"
                 >
                   Redact
                 </button>

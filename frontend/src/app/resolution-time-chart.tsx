@@ -47,12 +47,12 @@ export function ResolutionTimeChart({ query }: ResolutionTimeChartProps) {
                 <XAxis
                   dataKey="priority"
                   stroke={CHART_COLORS.axis}
-                  tick={{ fill: CHART_COLORS.textMuted, fontSize: 12 }}
+                  tick={{ fill: CHART_COLORS.textSecondary, fontSize: 12 }}
                 />
                 <YAxis
                   tickFormatter={(value: number) => formatDuration(value)}
                   stroke={CHART_COLORS.axis}
-                  tick={{ fill: CHART_COLORS.textMuted, fontSize: 12 }}
+                  tick={{ fill: CHART_COLORS.textSecondary, fontSize: 12 }}
                 />
                 <Tooltip
                   formatter={(value, _name, item) => [
@@ -66,6 +66,8 @@ export function ResolutionTimeChart({ query }: ResolutionTimeChartProps) {
                     border: `1px solid ${CHART_COLORS.grid}`,
                     fontSize: 12,
                   }}
+                  itemStyle={{ color: CHART_COLORS.textPrimary }}
+                  labelStyle={{ color: CHART_COLORS.textPrimary }}
                 />
                 <Bar
                   dataKey="seconds"

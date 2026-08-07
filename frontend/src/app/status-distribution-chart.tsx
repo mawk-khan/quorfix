@@ -18,6 +18,7 @@ export function StatusDistributionChart({ query }: StatusDistributionChartProps)
   return (
     <DashboardSection
       title="Bugs by status"
+      subtitle="Current backlog — not affected by the date range"
       query={query}
       isEmpty={(data) => data.status.every((row) => row.count === 0)}
       emptyMessage="No bugs in the current backlog."
@@ -30,7 +31,6 @@ export function StatusDistributionChart({ query }: StatusDistributionChartProps)
 
         return (
           <div aria-label="Current backlog, distribution of bug statuses — a current snapshot, unaffected by the date filter">
-            <p className="mb-2 text-xs text-gray-500">Current backlog — not affected by the date range</p>
             <ResponsiveContainer width="100%" height={Math.max(240, rows.length * 32)}>
               <BarChart
                 data={rows}
@@ -42,14 +42,14 @@ export function StatusDistributionChart({ query }: StatusDistributionChartProps)
                   type="number"
                   allowDecimals={false}
                   stroke={CHART_COLORS.axis}
-                  tick={{ fill: CHART_COLORS.textMuted, fontSize: 12 }}
+                  tick={{ fill: CHART_COLORS.textSecondary, fontSize: 12 }}
                 />
                 <YAxis
                   type="category"
                   dataKey="label"
                   width={100}
                   stroke={CHART_COLORS.axis}
-                  tick={{ fill: CHART_COLORS.textMuted, fontSize: 12 }}
+                  tick={{ fill: CHART_COLORS.textSecondary, fontSize: 12 }}
                 />
                 <Tooltip
                   formatter={(value) => [formatCount(Number(value)), "Bugs"]}
@@ -58,6 +58,8 @@ export function StatusDistributionChart({ query }: StatusDistributionChartProps)
                     border: `1px solid ${CHART_COLORS.grid}`,
                     fontSize: 12,
                   }}
+                  itemStyle={{ color: CHART_COLORS.textPrimary }}
+                  labelStyle={{ color: CHART_COLORS.textPrimary }}
                 />
                 <Bar
                   dataKey="count"

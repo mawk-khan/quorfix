@@ -159,6 +159,34 @@ export function MentionTextarea({
 
   return (
     <div className="relative">
+      {/* Manually reviewed against the WAI-ARIA APG "Editable Combobox With
+          List Autocomplete" pattern (not just axe — axe's SVG/host-language
+          checks don't cover the actual relationship semantics anyway):
+            - role="combobox" + aria-autocomplete="list"                 ✓
+            - aria-expanded reflects popup visibility                    ✓
+            - aria-controls names the listbox, only while it exists      ✓
+            - aria-activedescendant names the active option, cleared
+              when closed                                                ✓
+            - aria-haspopup is deliberately OMITTED: the APG pattern says
+              not to set it on role="combobox", since the popup type is
+              already implied (defaults to listbox) — adding it back
+              would be redundant, not more correct.
+          The one non-conformance is host-language, not semantic: the
+          ARIA-in-HTML permitted-roles table never enumerates <textarea> as
+          a valid host for role="combobox" (its allowed-roles list assumes
+          single-line inputs), so axe's aria-allowed-role flags it. Actually
+          removing the role to satisfy that table breaks a stricter rule
+          instead — aria-expanded/aria-controls/aria-activedescendant are
+          only valid on elements whose role supports them, and the
+          textarea's implicit "textbox" role doesn't (verified directly:
+          dropping the role turns this axe-clean but produces a *critical*
+          aria-allowed-attr violation on aria-expanded, which is worse).
+          Screen readers compute the accessible role from the explicit role
+          attribute regardless of host element, so combobox-on-textarea is
+          honored correctly in practice — this keeps the real, correct
+          popup relationship and accepts the harmless table gap. See
+          mention-textarea.test.tsx's "wires the editable-combobox ARIA
+          relationship correctly" test, which pins this contract down. */}
       <textarea
         ref={textareaRef}
         id={id}
@@ -178,7 +206,7 @@ export function MentionTextarea({
         aria-controls={open ? listboxId : undefined}
         aria-activedescendant={activeOptionId}
         role="combobox"
-        className="w-full rounded border px-3 py-2"
+        className="w-full rounded-field border border-border bg-surface px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:border-primary aria-invalid:border-danger aria-invalid:focus-visible:ring-danger"
       />
       {/* Announces the suggestion count as it changes while composing an
           "@" mention — separate from the listbox itself, since a listbox's
@@ -195,7 +223,7 @@ export function MentionTextarea({
           id={listboxId}
           role="listbox"
           aria-label="Mention suggestions"
-          className="absolute z-10 mt-1 max-h-48 w-64 overflow-y-auto rounded border bg-white shadow-lg"
+          className="absolute z-10 mt-1 max-h-48 w-64 overflow-y-auto rounded-card border border-border bg-surface py-1 shadow-md"
         >
           {suggestions.map((member, index) => (
             <li
@@ -211,11 +239,11 @@ export function MentionTextarea({
               }}
               onMouseEnter={() => setActiveIndex(index)}
               className={`cursor-pointer px-3 py-1.5 text-sm ${
-                index === activeIndex ? "bg-blue-50" : ""
+                index === activeIndex ? "bg-primary-subtle" : ""
               }`}
             >
-              <span className="font-medium">{memberLabel(member)}</span>{" "}
-              <span className="text-gray-500">({member.user.email})</span>
+              <span className="font-medium text-text-primary">{memberLabel(member)}</span>{" "}
+              <span className="text-text-secondary">({member.user.email})</span>
             </li>
           ))}
         </ul>

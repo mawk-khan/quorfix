@@ -1,8 +1,13 @@
 "use client";
 
+import { FolderKanban } from "lucide-react";
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import type { Project } from "@/lib/api/types";
+
+import { ProjectStatusBadge } from "./project-badges";
 
 interface ProjectTableProps {
   projects: Project[];
@@ -15,52 +20,59 @@ function leadLabel(lead: Project["lead"]): string {
   return fullName || lead.email;
 }
 
+const HEADERS = ["Key", "Name", "Status", "Lead", "Archived"];
+
 export function ProjectTable({ projects, hasActiveFilters }: ProjectTableProps) {
   if (projects.length === 0) {
-    return (
-      <p className="text-sm text-gray-500">
-        {hasActiveFilters ? "No projects match your search or filters." : "No projects yet."}
-      </p>
+    return hasActiveFilters ? (
+      <EmptyState title="No projects match your search or filters" description="Try adjusting or clearing the filters above." />
+    ) : (
+      <EmptyState icon={FolderKanban} title="No projects yet" />
     );
   }
 
   return (
-    <table className="mt-2 w-full text-left text-sm">
-      <caption className="sr-only">Projects</caption>
-      <thead>
-        <tr>
-          <th scope="col" className="pb-2">
-            Key
-          </th>
-          <th scope="col" className="pb-2">
-            Name
-          </th>
-          <th scope="col" className="pb-2">
-            Status
-          </th>
-          <th scope="col" className="pb-2">
-            Lead
-          </th>
-          <th scope="col" className="pb-2">
-            Archived
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        {projects.map((project) => (
-          <tr key={project.id} className="border-t">
-            <td className="py-2 font-mono">{project.key}</td>
-            <td className="py-2">
-              <Link href={`/projects/${project.id}`} className="underline">
-                {project.name}
-              </Link>
-            </td>
-            <td className="py-2">{project.status.replace("_", " ")}</td>
-            <td className="py-2">{leadLabel(project.lead)}</td>
-            <td className="py-2">{project.archived_at ? "Archived" : "Active"}</td>
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <caption className="sr-only">Projects</caption>
+        <thead>
+          <tr className="border-b border-border">
+            {HEADERS.map((header) => (
+              <th
+                key={header}
+                scope="col"
+                className="whitespace-nowrap px-4 py-2.5 text-xs font-medium text-text-secondary first:pl-5 last:pr-5"
+              >
+                {header}
+              </th>
+            ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {projects.map((project) => (
+            <tr key={project.id} className="border-b border-border last:border-b-0 hover:bg-page">
+              <td className="whitespace-nowrap px-4 py-3 pl-5 font-mono text-xs text-text-secondary">
+                {project.key}
+              </td>
+              <td className="whitespace-nowrap px-4 py-3">
+                <Link
+                  href={`/projects/${project.id}`}
+                  className="font-medium text-text-primary underline underline-offset-2 hover:text-primary"
+                >
+                  {project.name}
+                </Link>
+              </td>
+              <td className="whitespace-nowrap px-4 py-3">
+                <ProjectStatusBadge status={project.status} />
+              </td>
+              <td className="whitespace-nowrap px-4 py-3 text-text-primary">{leadLabel(project.lead)}</td>
+              <td className="whitespace-nowrap px-4 py-3 pr-5">
+                {project.archived_at ? <Badge tone="amber">Archived</Badge> : <Badge tone="green">Active</Badge>}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

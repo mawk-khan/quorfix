@@ -4,6 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 
 import { AccessState } from "@/components/access-state";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api/client";
 import { cancelInvitation, createInvitation, listInvitations } from "@/lib/api/invitations";
 import { listMembers, removeMember, updateMemberRole } from "@/lib/api/members";
@@ -13,6 +16,7 @@ import { usePageTitle } from "@/lib/use-page-title";
 
 import { InviteForm } from "./invite-form";
 import { MembersTable } from "./members-table";
+import { ROLE_LABELS } from "./role-labels";
 
 function describeError(error: unknown): string {
   if (
@@ -76,8 +80,8 @@ export default function TeamPage() {
 
   if (sessionLoading || membersQuery.isLoading) {
     return (
-      <main id="main-content" tabIndex={-1} className="p-8">
-        <p>Loading team…</p>
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-4xl space-y-6 p-8">
+        <Skeleton className="h-64" />
       </main>
     );
   }
@@ -95,73 +99,68 @@ export default function TeamPage() {
   }
 
   return (
-    <main id="main-content" tabIndex={-1} className="mx-auto max-w-3xl space-y-8 p-8">
-      <h1 className="text-xl font-semibold">Team</h1>
+    <main id="main-content" tabIndex={-1} className="mx-auto max-w-4xl space-y-6 p-8">
+      <PageHeader title="Team" />
 
       {actionError && (
-        <p role="alert" className="text-sm text-red-700">
+        <p role="alert" className="rounded-field border border-danger/20 bg-danger-subtle p-3 text-sm text-danger">
           {actionError}
         </p>
       )}
 
-      <section aria-labelledby="members-heading">
-        <h2 id="members-heading" className="text-lg font-medium">
-          Members
-        </h2>
+      <Card>
+        <CardHeader title="Members" />
         <MembersTable
           members={membersQuery.data ?? []}
           isAdmin={isAdmin}
           onRoleChange={(id, role) => roleMutation.mutate({ id, role })}
           onRemove={(id) => removeMutation.mutate(id)}
         />
-      </section>
+      </Card>
 
       {isAdmin && (
-        <section aria-labelledby="invitations-heading">
-          <h2 id="invitations-heading" className="text-lg font-medium">
-            Pending invitations
-          </h2>
-          {!invitationsQuery.data || invitationsQuery.data.length === 0 ? (
-            <p className="text-sm text-gray-500">No pending invitations.</p>
-          ) : (
-            <ul className="mt-2 space-y-2 text-sm">
-              {invitationsQuery.data.map((invitation) => (
-                <li
-                  key={invitation.id}
-                  className="flex items-center justify-between border-t py-2"
-                >
-                  <span>
-                    {invitation.email} — {invitation.role}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => cancelMutation.mutate(invitation.id)}
-                    className="text-sm text-red-700 underline"
-                  >
-                    Cancel
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
+        <Card>
+          <CardHeader title="Pending invitations" />
+          <CardContent className="space-y-4">
+            {!invitationsQuery.data || invitationsQuery.data.length === 0 ? (
+              <p className="text-sm text-text-secondary">No pending invitations.</p>
+            ) : (
+              <ul className="divide-y divide-border">
+                {invitationsQuery.data.map((invitation) => (
+                  <li key={invitation.id} className="flex items-center justify-between py-2 text-sm first:pt-0">
+                    <span className="text-text-primary">
+                      {invitation.email} — {ROLE_LABELS[invitation.role]}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => cancelMutation.mutate(invitation.id)}
+                      className="font-medium text-danger underline"
+                    >
+                      Cancel
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
 
-          {lastInviteUrl && (
-            <p role="status" className="mt-2 text-sm text-green-700">
-              Invitation created. Share this link (shown only once):{" "}
-              <a href={lastInviteUrl} className="underline">
-                {lastInviteUrl}
-              </a>
-            </p>
-          )}
+            {lastInviteUrl && (
+              <p role="status" className="text-sm text-success">
+                Invitation created. Share this link (shown only once):{" "}
+                <a href={lastInviteUrl} className="underline">
+                  {lastInviteUrl}
+                </a>
+              </p>
+            )}
 
-          <InviteForm
-            onSubmit={(values) => {
-              setLastInviteUrl(null);
-              inviteMutation.mutate(values);
-            }}
-            isSubmitting={inviteMutation.isPending}
-          />
-        </section>
+            <InviteForm
+              onSubmit={(values) => {
+                setLastInviteUrl(null);
+                inviteMutation.mutate(values);
+              }}
+              isSubmitting={inviteMutation.isPending}
+            />
+          </CardContent>
+        </Card>
       )}
     </main>
   );
