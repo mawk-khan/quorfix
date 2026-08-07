@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { buildMentionToken } from "@/lib/api/comments";
 import type { Membership } from "@/lib/api/types";
@@ -66,6 +66,26 @@ export function MentionTextarea({
   const listboxId = useId();
   const [trigger, setTrigger] = useState<{ start: number; query: string } | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const pendingCursorRef = useRef<number | null>(null);
+  const [cursorRequestId, setCursorRequestId] = useState(0);
+
+  // Runs synchronously after the DOM commits the inserted mention text (see
+  // insertMention) — in the same React flush as the onChange/setCursorRequestId
+  // calls it pairs with, never on a later, unbounded animation frame. A
+  // requestAnimationFrame here previously raced with anything the user did
+  // before the next paint (most commonly: immediately typing further),
+  // since the frame's callback could fire in the middle of that follow-up
+  // typing and yank the caret back, scrambling the just-typed characters.
+  useLayoutEffect(() => {
+    const cursor = pendingCursorRef.current;
+    if (cursor === null) return;
+    pendingCursorRef.current = null;
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.focus();
+      textarea.setSelectionRange(cursor, cursor);
+    }
+  }, [cursorRequestId]);
 
   const suggestions = useMemo(() => {
     if (!trigger) return [];
@@ -112,13 +132,8 @@ export function MentionTextarea({
     const nextValue = `${before}${insertion}${after}`;
     onChange(nextValue);
     setTrigger(null);
-
-    requestAnimationFrame(() => {
-      if (!textareaRef.current) return;
-      const cursor = before.length + insertion.length;
-      textareaRef.current.focus();
-      textareaRef.current.setSelectionRange(cursor, cursor);
-    });
+    pendingCursorRef.current = before.length + insertion.length;
+    setCursorRequestId((id) => id + 1);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {

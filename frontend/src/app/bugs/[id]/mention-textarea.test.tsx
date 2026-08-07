@@ -92,11 +92,18 @@ describe("MentionTextarea", () => {
     await user.type(textarea, "@ada");
     await user.click(await screen.findByRole("option", { name: /ada lovelace/i }));
     const firstValue = screen.getByTestId("value").textContent ?? "";
-    expect(firstValue.match(/mention:u1/g)).toHaveLength(1);
+    expect(firstValue).toBe("@[Ada Lovelace](mention:u1) ");
 
+    // Regression coverage: selecting a mention moves the caret to just past
+    // the inserted token so immediately typing more continues from there,
+    // in order, rather than the caret jumping elsewhere mid-keystroke and
+    // scrambling the characters (see mention-textarea.tsx's insertMention/
+    // useLayoutEffect for why this was previously a real race, not just a
+    // test timing issue).
     await user.type(textarea, "@ada");
+    expect(screen.getByTestId("value")).toHaveTextContent("@[Ada Lovelace](mention:u1) @ada");
     await user.click(await screen.findByRole("option", { name: /ada lovelace/i }));
     const secondValue = screen.getByTestId("value").textContent ?? "";
-    expect(secondValue.match(/mention:u1/g)).toHaveLength(1);
+    expect(secondValue).toBe("@[Ada Lovelace](mention:u1) ");
   });
 });
