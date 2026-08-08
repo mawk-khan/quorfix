@@ -85,14 +85,19 @@ export async function waitForNotificationsPageToContain(
         // page.goto() resolves once the document has loaded — well before
         // the client-side TanStack Query fetch it triggers has resolved.
         // Reading innerText immediately after goto would almost always
-        // observe the "Loading…" placeholder rather than the fetch's
-        // result, regardless of how many times this polls. Wait for that
-        // placeholder to clear (or confirm it was never there — an
-        // already-cached/instant response) before reading content.
+        // observe a loading placeholder rather than the fetch's result,
+        // regardless of how many times this polls. Two separate loading
+        // states exist here and both must clear: the session guard (a
+        // literal "Loading…" paragraph) and the notifications list query
+        // itself, which renders as an aria-hidden, textless Skeleton — so
+        // waiting for "Loading…" to detach says nothing about whether the
+        // list query has resolved. networkidle covers both without coupling
+        // this helper to either page's specific loading markup.
         await page
           .getByText("Loading…", { exact: true })
           .waitFor({ state: "detached", timeout: 5000 })
           .catch(() => {});
+        await page.waitForLoadState("networkidle");
         const text = await page.locator("main").innerText();
         return pattern.test(text);
       },

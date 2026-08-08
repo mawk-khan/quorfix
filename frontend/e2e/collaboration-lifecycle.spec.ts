@@ -40,7 +40,7 @@ async function createBug(page: Page, title: string): Promise<{ id: string; key: 
   await expect(page.getByRole("heading", { name: title })).toBeVisible({ timeout: 15000 });
   const id = new URL(page.url()).pathname.split("/").filter(Boolean).pop() ?? "";
   expect(id).not.toBe("");
-  const key = (await page.locator("p.font-mono").first().textContent())?.trim() ?? "";
+  const key = (await page.locator("span.font-mono").first().textContent())?.trim() ?? "";
   expect(key).not.toBe("");
   return { id, key };
 }

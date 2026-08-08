@@ -153,7 +153,7 @@ test.describe.serial("bug lifecycle", () => {
 
     await signIn(page, ADMIN_EMAIL);
     await page.goto(`/bugs/${originalId}`);
-    const originalKey = (await page.locator("p.font-mono").first().textContent())?.trim() ?? "";
+    const originalKey = (await page.locator("span.font-mono").first().textContent())?.trim() ?? "";
     expect(originalKey).not.toBe("");
 
     await page.goto(`/bugs/${duplicateId}`);

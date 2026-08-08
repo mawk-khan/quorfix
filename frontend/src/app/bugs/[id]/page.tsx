@@ -619,7 +619,7 @@ export default function BugDetailPage() {
                   }}
                   className="space-y-2 border-b border-border pb-4"
                 >
-                  <FormField htmlFor="transition-target" label="Change status">
+                  <FormField htmlFor="transition-target" label="New status">
                     <Select
                       id="transition-target"
                       value={transitionTarget}
@@ -672,6 +672,9 @@ export default function BugDetailPage() {
                     <Button type="submit" variant="secondary" size="sm" disabled={assignMutation.isPending}>
                       Update assignee
                     </Button>
+                    <p data-testid="current-assignee" className="text-sm text-text-secondary">
+                      {bug.assignee ? `Currently assigned to ${userLabel(bug.assignee)}` : "Currently unassigned"}
+                    </p>
                   </form>
                 ) : (
                   <div className="mt-1.5 flex items-center gap-2">
