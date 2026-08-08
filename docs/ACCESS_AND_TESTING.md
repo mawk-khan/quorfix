@@ -151,6 +151,76 @@ every status, priority, and severity, backdated across roughly the previous 45 d
 dashboard (see below) has a meaningful trend to chart — and prints these credentials to the
 console on each run (development settings only).
 
+## Backend admin (Django) access
+
+No account is seeded with `is_staff`/`is_superuser` by default — none of `seed_demo`,
+`seed_e2e_bug_fixture`, or `seed_e2e_analytics_fixture` grant Django-admin access, only
+application-level organization roles. To sign in at http://localhost:8000/admin/, create one
+explicitly:
+
+```bash
+docker compose exec backend python manage.py createsuperuser
+```
+
+No app registers any models with the Django admin site (there is no `admin.py` under any
+`backend/apps/*`), so the admin index is effectively empty after signing in — this gives you
+Django's login and the default `auth`/`sessions` framework views only, not a browsable view of
+Quorfix's own data. Use `/api/docs/` or `manage.py shell` to inspect application data instead.
+See [docs/INSTALLATION.md](./INSTALLATION.md) for the same command in the context of a fresh
+install.
+
+## E2E fixture accounts (for manual review)
+
+Two additional, independently-namespaced account sets exist purely for the Playwright suite,
+but work identically for manual sign-in and are often the fastest way to poke at a specific
+role without touching your own `seed_demo` data. **Development-only, same production refusal
+guarantee as `seed_demo`.**
+
+Seed them with:
+
+```bash
+docker compose exec backend python manage.py seed_e2e_bug_fixture
+docker compose exec backend python manage.py seed_e2e_analytics_fixture
+```
+
+Both are idempotent and safe to run alongside `seed_demo` — each seeds its organization with
+`is_active=False`, which is the one flag Community's single-active-organization check
+(`OrganizationPolicy.can_create_additional_organization()`) looks at, so these fixtures never
+trip `seed_demo`'s "a different organization already exists" refusal or count against the
+one-active-org limit. They remain fully functional for sign-in and every bug/project operation
+regardless.
+
+**Bug E2E Org** (`bug-e2e-org`, project `BEP`) — from `seed_e2e_bug_fixture`:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Administrator | bug-e2e-admin@example.com | BugE2EPass123! |
+| Developer | bug-e2e-developer@example.com | BugE2EPass123! |
+| QA | bug-e2e-qa@example.com | BugE2EPass123! |
+| Reporter | bug-e2e-reporter@example.com | BugE2EPass123! |
+| Viewer | bug-e2e-viewer@example.com | BugE2EPass123! |
+
+**Analytics E2E Org** (`analytics-e2e-org`, project `ANLY`, pre-populated with 8 backdated bugs
+across every status — useful for exercising the dashboard without waiting on demo data) — from
+`seed_e2e_analytics_fixture`:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Administrator | analytics-e2e-admin@example.com | AnalyticsE2EPass123! |
+| Developer | analytics-e2e-developer@example.com | AnalyticsE2EPass123! |
+| QA | analytics-e2e-qa@example.com | AnalyticsE2EPass123! |
+| Reporter | analytics-e2e-reporter@example.com | AnalyticsE2EPass123! |
+| Viewer | analytics-e2e-viewer@example.com | AnalyticsE2EPass123! |
+
+If you're seeding these on a database the E2E suite has also touched (rather than a plain
+`seed_demo` install), reset `SetupLock` the same way `frontend/e2e/global-setup.ts` does before
+reseeding, or first-run `/setup` will stay blocked:
+
+```bash
+docker compose exec backend python manage.py shell -c \
+  "from apps.organizations.models import SetupLock; SetupLock.objects.get_or_create(id=1)"
+```
+
 ## Role matrix
 
 Reflects the actual backend authorization rules (`apps/bugs/policies.py`,
