@@ -1,6 +1,27 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import nextConfig from "./next.config";
+
+// next.config.ts computes its CSP's 'unsafe-eval' inclusion once at module
+// import time from process.env.NODE_ENV — dynamically re-importing the
+// module after changing that env var (with the module cache reset in
+// between) is the only way to observe both branches in one test run,
+// mirroring how `next build` vs. `next dev` actually differ at process
+// start, not per-request.
+async function loadConfigWithNodeEnv(nodeEnv: string) {
+  // vi.stubEnv (not a direct process.env.NODE_ENV assignment) sidesteps
+  // @types/node typing NODE_ENV as read-only, and vi.unstubAllEnvs below
+  // restores the original value automatically rather than this function
+  // having to remember it.
+  vi.stubEnv("NODE_ENV", nodeEnv);
+  vi.resetModules();
+  try {
+    const mod = await import("./next.config");
+    return mod.default;
+  } finally {
+    vi.unstubAllEnvs();
+  }
+}
 
 // Calls next.config.ts's own headers() function directly — the same
 // function Next.js itself calls to build every response's header set — so
@@ -25,10 +46,27 @@ describe("next.config.ts headers()", () => {
     expect(entries[0]?.source).toBe("/:path*");
   });
 
-  it("sends a Content-Security-Policy with no unsafe-eval", async () => {
+  it("sends a Content-Security-Policy", async () => {
     const headers = await getHeaders();
     expect(headers["Content-Security-Policy"]).toBeDefined();
-    expect(headers["Content-Security-Policy"]).not.toContain("unsafe-eval");
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("omits unsafe-eval in production — Turbopack's production output never calls eval()", async () => {
+    const prodConfig = await loadConfigWithNodeEnv("production");
+    const entries = await prodConfig.headers!();
+    const csp = entries[0]?.headers.find((h) => h.key === "Content-Security-Policy")?.value ?? "";
+    expect(csp).not.toContain("unsafe-eval");
+  });
+
+  it("allows unsafe-eval outside production — next dev's React Fast Refresh needs eval()", async () => {
+    const devConfig = await loadConfigWithNodeEnv("development");
+    const entries = await devConfig.headers!();
+    const csp = entries[0]?.headers.find((h) => h.key === "Content-Security-Policy")?.value ?? "";
+    expect(csp).toContain("'unsafe-eval'");
   });
 
   it("restricts default-src, frame-ancestors, and object-src", async () => {

@@ -32,16 +32,23 @@ const allowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(",").filte
 //     security-headers pass. 'unsafe-inline' for script-src is the
 //     documented, honest trade-off this specific constraint requires — not
 //     a default reached without checking the alternative.
-//   - No unsafe-eval anywhere: production Turbopack output does not use
-//     eval() (that's a dev-server-only source-map mechanism).
+//   - No unsafe-eval in production: production Turbopack output does not
+//     use eval() (that's a dev-server-only source-map mechanism). next dev
+//     itself does use eval() for React's Fast Refresh / stack-trace
+//     reconstruction, so 'unsafe-eval' is appended to script-src below only
+//     when NODE_ENV !== "production" — the header list runs at config-time
+//     against this same env var, not per-request, so it can't drift from
+//     which server actually started.
 //   - No data: URIs and no external font/script/style CDNs anywhere in this
 //     app — next/font (Inter, see app/layout.tsx) self-hosts the font files
 //     at build time and serves them from this app's own origin, never a
 //     runtime request to fonts.googleapis.com, so img-src/font-src need
 //     nothing beyond 'self'.
+const isProduction = process.env.NODE_ENV === "production";
+
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self'",
   "font-src 'self'",
