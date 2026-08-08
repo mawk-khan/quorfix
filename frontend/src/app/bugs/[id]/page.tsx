@@ -609,7 +609,7 @@ export default function BugDetailPage() {
 
         <div className="space-y-6">
           <Card>
-            <CardHeader title="Details" />
+            <CardHeader title="Status" />
             <CardContent className="space-y-4">
               {!isArchived && bug.available_transitions.length > 0 && (
                 <form
