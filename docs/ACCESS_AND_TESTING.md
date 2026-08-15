@@ -25,7 +25,7 @@ All URLs below assume the default local Docker Compose ports (see `docker-compos
 | Notification preferences | http://localhost:3000/notifications/preferences |
 | Backend health | http://localhost:8000/api/health/ |
 | Frontend-proxied backend health | http://localhost:3000/api/health/ |
-| Backend API docs (OpenAPI/Swagger) | http://localhost:8000/api/docs/ |
+| Backend API docs (OpenAPI/Swagger) — requires sign-in | http://localhost:8000/api/docs/ |
 | Backend admin | http://localhost:8000/admin/ |
 
 The frontend proxies every `/api/*` request to the backend (see `frontend/next.config.ts`), so in
@@ -48,7 +48,11 @@ docker compose exec backend python manage.py migrate
 make seed-demo
 ```
 
-`seed_demo` is idempotent (safe to re-run) and refuses to run under production settings.
+`seed_demo` is idempotent (safe to re-run) and, under production-hardened settings
+(`ENVIRONMENT=production`, e.g. `docker-compose.prod.yml`), refuses to run at all unless
+`QUORFIX_DISPOSABLE_DATABASE=true` and `DEMO_ADMIN_PASSWORD` are both explicitly set — see
+[docs/DEMO_DEPLOYMENT.md](./DEMO_DEPLOYMENT.md) for the full production/demo seeding procedure.
+Local development (this section) is unaffected — no extra flags needed.
 
 ## Reset and reseed
 
@@ -166,6 +170,12 @@ No app registers any models with the Django admin site (there is no `admin.py` u
 `backend/apps/*`), so the admin index is effectively empty after signing in — this gives you
 Django's login and the default `auth`/`sessions` framework views only, not a browsable view of
 Quorfix's own data. Use `/api/docs/` or `manage.py shell` to inspect application data instead.
+
+`POST /admin/login/` is throttled at the application layer (10 failed attempts / 5 minutes per
+client IP — see `apps.core.middleware.admin_login_throttle`, `docs/SECURITY.md` "Rate
+limiting"), independently of the DRF-only scopes above. Repeatedly testing wrong credentials
+locally will trip this the same way it would in production.
+
 See [docs/INSTALLATION.md](./INSTALLATION.md) for the same command in the context of a fresh
 install.
 

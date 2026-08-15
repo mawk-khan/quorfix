@@ -65,6 +65,7 @@ class SessionView(APIView):
             "user": user,
             "organization": organization,
             "role": membership.role if membership else None,
+            "demo_banner": settings.DEMO_BANNER_MESSAGE,
         }
         return Response(SessionSerializer(data).data)
 

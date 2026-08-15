@@ -90,6 +90,12 @@ configuration, and the operator scripts under `scripts/`.
 
 ## Deployment assumptions
 
+Running a separate, public invite-only demo/community-beta instance specifically? See
+[docs/DEMO_DEPLOYMENT.md](./DEMO_DEPLOYMENT.md) for the required isolation boundary from any
+real deployment, the account model, account recovery, and the data reset procedure — this
+section and the rest of this document are the general deployment assumptions that apply either
+way.
+
 `docker-compose.prod.yml` (see `docs/BACKUP_AND_RESTORE.md`, `docs/UPGRADING.md`) is a
 cloud-neutral example, not a complete, hardened production deployment on its own. It assumes:
 
@@ -123,6 +129,30 @@ Backend cookies are still hardened regardless: `config/settings/production.py` h
 startup by `apps.core.checks` and by a dedicated test
 (`backend/apps/core/tests/test_production_settings_real_values.py`) that checks the *real*,
 committed production settings module, not just a synthetic stand-in.
+
+### Request body / upload size limits
+
+Two independent layers, neither of which is a substitute for the other:
+
+- **Non-file request bodies** (JSON API calls — bug/comment/project creation, etc.): Django's
+  own `DATA_UPLOAD_MAX_MEMORY_SIZE` (default 2.5&nbsp;MB, never overridden in this project)
+  rejects an oversized body with `RequestDataTooBig` before the view ever runs. This already
+  bounds "huge text payload" abuse without any Quorfix-specific code.
+- **Attachment uploads** (`multipart/form-data`, `PUT /api/attachments/{id}/bytes/`): Django
+  explicitly excludes multipart file parts from `DATA_UPLOAD_MAX_MEMORY_SIZE` — the file is
+  received and spooled to a temp file *before* `apps.attachments.validators.validate_size`
+  rejects anything over `MAX_ATTACHMENT_SIZE_BYTES` (10&nbsp;MB). Django has no built-in hard
+  cap on multipart upload size; nothing in this application layer can reject an oversized file
+  before it's fully received.
+
+**Required reverse-proxy configuration**, not yet present anywhere in this repository (no
+nginx/Caddy config is checked in — see "Deployment assumptions" above): the operator's reverse
+proxy in front of `frontend` must cap request body size at the network layer, e.g. nginx's
+`client_max_body_size 11m;` (slightly above `MAX_ATTACHMENT_SIZE_BYTES` so a legitimate
+10&nbsp;MB upload's multipart framing overhead isn't itself rejected). Without this, an
+oversized upload still gets rejected — but only after consuming bandwidth and temp disk space
+receiving it, which matters for a public demo instance's disk/bandwidth budget more than it
+would for a trusted-user internal deployment.
 
 ### Response headers
 
@@ -237,12 +267,24 @@ Audited in Phase 6 Chunk G. Current throttle scopes
 | `invitation-create` | 20/hour | Administrator-only, but sends email to an address the admin doesn't have to own — grouped with the other invitation endpoints rather than left unthrottled. |
 | `attachment-upload` | 30/min | Shared by both halves of an upload (initiate + upload-bytes) — bounds how fast one account can fill the local attachment volume; generous enough for a normal multi-file drag-and-drop. |
 
-**Deliberately not throttled**: bug creation, comment creation/editing. Both were audited
-against the same disk/resource-exhaustion concern as attachments and found not to warrant it
-— a spammed bug or comment is a small database row, not a multi-megabyte file, and normal
-legitimate use (bulk triage, active discussion) can plausibly approach any conservative limit
-tight enough to matter as abuse resistance. This is a considered decision, not an oversight;
-revisit it if real abuse is observed.
+Additionally, `POST /admin/login/` (Django's own admin, not a DRF view — the scopes above don't
+cover it) is throttled separately by
+`apps.core.middleware.admin_login_throttle.AdminLoginThrottleMiddleware`: 10 failed attempts per
+5 minutes per client IP, using the same shared Redis cache. This is defense-in-depth, not the
+primary control — in this project's actual deployment topology, `/admin/` is never proxied
+through the public frontend at all (`frontend/next.config.ts` only rewrites `/api/*`, and
+`docker-compose.prod.yml` never publishes the backend's port), so it is unreachable from the
+internet by default regardless. It also grants no seeded account access: no `seed_demo`,
+`seed_e2e_*`, or `/api/setup/`-created account is ever given `is_staff`/`is_superuser` — see
+"Backend admin (Django) access" in `docs/ACCESS_AND_TESTING.md`.
+
+**Deliberately not throttled**: bug creation, comment creation/editing, project creation. All
+were audited against the same disk/resource-exhaustion concern as attachments and found not to
+warrant it — a spammed bug, comment, or project is a small database row, not a multi-megabyte
+file, and normal legitimate use (bulk triage, active discussion) can plausibly approach any
+conservative limit tight enough to matter as abuse resistance. This is a considered decision,
+not an oversight, and holds equally for an invite-only demo deployment — the abuse surface
+doesn't change based on who was invited. Revisit it if real abuse is observed.
 
 ## Dependency scan policy
 

@@ -99,8 +99,11 @@ make prod-migrate  # explicit, separate step — never run automatically
 See [docs/INSTALLATION.md](./docs/INSTALLATION.md) for required production origins
 (`quorfix.com` examples), reverse-proxy/TLS expectations, and a clean-install walkthrough;
 [docs/BACKUP_AND_RESTORE.md](./docs/BACKUP_AND_RESTORE.md) for PostgreSQL and local
-attachment backup/restore procedures; and [docs/UPGRADING.md](./docs/UPGRADING.md) for the
-upgrade, migration, and rollback procedure.
+attachment backup/restore procedures; [docs/UPGRADING.md](./docs/UPGRADING.md) for the
+upgrade, migration, and rollback procedure; and
+[docs/DEMO_DEPLOYMENT.md](./docs/DEMO_DEPLOYMENT.md) for running a separate, isolated
+invite-only demo/community-beta instance specifically (account model, credential rotation,
+and the data reset procedure).
 
 ## Observability
 

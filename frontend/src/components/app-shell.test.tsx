@@ -46,12 +46,13 @@ vi.mock("@/lib/api/auth", () => ({
 
 import { getSession } from "@/lib/api/auth";
 
-function mockAuthenticated(): void {
+function mockAuthenticated(overrides: Partial<Session> = {}): void {
   vi.mocked(getSession).mockResolvedValue({
     authenticated: true,
     role: "administrator",
     user: { id: "u1", email: "admin@example.com", first_name: "Ada", last_name: "Admin" },
     organization: { id: "o1", name: "Acme" },
+    ...overrides,
   } as Session);
 }
 
@@ -127,5 +128,54 @@ describe("AppShell", () => {
     await screen.findByRole("link", { name: "Bugs" });
 
     expect(outsideButton).toHaveFocus();
+  });
+
+  it("renders no demo banner by default", async () => {
+    mockAuthenticated();
+    renderWithProviders(
+      <AppShell>
+        <main id="main-content" tabIndex={-1} />
+      </AppShell>,
+    );
+
+    await screen.findByRole("link", { name: "Bugs" });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("renders the demo banner text when the session provides one", async () => {
+    mockAuthenticated({ demo_banner: "This is a shared demo environment." });
+    renderWithProviders(
+      <AppShell>
+        <main id="main-content" tabIndex={-1} />
+      </AppShell>,
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "This is a shared demo environment.",
+    );
+  });
+
+  it("renders the demo banner on public routes too, before sign-in", async () => {
+    mockPathname = "/sign-in";
+    vi.mocked(getSession).mockResolvedValue({
+      authenticated: false,
+      role: null,
+      user: null,
+      organization: null,
+      demo_banner: "Demo data may be reset at any time.",
+    } as Session);
+
+    renderWithProviders(
+      <AppShell>
+        <main id="main-content" tabIndex={-1}>
+          sign-in page
+        </main>
+      </AppShell>,
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Demo data may be reset at any time.",
+    );
+    expect(screen.getByText("sign-in page")).toBeInTheDocument();
   });
 });

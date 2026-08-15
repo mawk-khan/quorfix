@@ -62,6 +62,11 @@ MIDDLEWARE = [
     # immediately after RequestIdMiddleware so its log line already carries
     # the request_id that middleware establishes.
     "apps.core.middleware.request_logging.RequestLoggingMiddleware",
+    # Defense-in-depth brute-force throttle for POST /admin/login/ — Django's
+    # classic admin login isn't a DRF view, so the ScopedRateThrottle rates
+    # below never cover it. See apps.core.middleware.admin_login_throttle for
+    # why this is defense-in-depth rather than the primary control.
+    "apps.core.middleware.admin_login_throttle.AdminLoginThrottleMiddleware",
     # Serves STATIC_ROOT directly from the WSGI process — there is no
     # separate reverse proxy or CDN in front of gunicorn in this cloud-
     # neutral setup. Harmless in development/test too: it only serves files
@@ -214,6 +219,14 @@ REST_FRAMEWORK = {
 INVITATION_EXPIRY_DAYS = 7
 FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:3000")
 
+# Optional site-wide notice (e.g. "This is a shared demo environment — data
+# may be reset and is visible to other demo users. Do not enter confidential
+# information."), surfaced via SessionView/SessionSerializer and rendered by
+# the frontend's AppShell. Empty by default — a normal/private installation
+# shows nothing unless an operator deliberately sets this. Plain text only;
+# the frontend renders it as text, never as HTML.
+DEMO_BANNER_MESSAGE = os.environ.get("DEMO_BANNER_MESSAGE", "").strip()
+
 # Comments: how long after posting an author may still edit/delete their own
 # comment. Administrators are not bound by this window.
 COMMENT_EDIT_WINDOW_MINUTES = 15
@@ -248,6 +261,14 @@ SPECTACULAR_SETTINGS = {
     # would warrant bumping it; see docs/RELEASING.md if that ever changes.
     "VERSION": "0.1.0",
     "SERVE_INCLUDE_SCHEMA": False,
+    # drf-spectacular's own default is AllowAny — that would let an
+    # unauthenticated internet visitor freely browse the complete API
+    # surface (every endpoint, field, and parameter shape) at /api/schema/
+    # and /api/docs/. Matches this project's own REST_FRAMEWORK
+    # DEFAULT_PERMISSION_CLASSES default below instead, so schema/docs
+    # require the same sign-in as the rest of the API rather than being the
+    # one anonymous-accessible exception to it.
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
 }
 
 CORS_ALLOWED_ORIGINS = get_list("CORS_ALLOWED_ORIGINS")

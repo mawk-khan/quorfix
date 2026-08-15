@@ -29,6 +29,7 @@ class SessionSerializer(serializers.Serializer):
     user = UserSerializer(allow_null=True)
     organization = OrganizationSerializer(allow_null=True)
     role = serializers.CharField(allow_null=True)
+    demo_banner = serializers.CharField(allow_blank=True)
 
 
 class InvitationSerializer(serializers.ModelSerializer):

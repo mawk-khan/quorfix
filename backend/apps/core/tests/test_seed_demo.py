@@ -6,6 +6,7 @@ from django.core.management.base import CommandError
 from django.test import override_settings
 from django.utils import timezone
 
+from apps.accounts.models import User
 from apps.bugs.models import Bug, BugStatus
 from apps.organizations.models import (
     CommunityRole,
@@ -33,12 +34,50 @@ def run_seed_demo() -> str:
 
 
 @pytest.mark.django_db
-def test_refuses_to_run_under_production_settings():
-    with override_settings(SETTINGS_MODULE="config.settings.production"):
-        with pytest.raises(CommandError):
+def test_refuses_to_run_under_production_environment():
+    with override_settings(ENVIRONMENT="production"):
+        with pytest.raises(CommandError, match="QUORFIX_DISPOSABLE_DATABASE"):
             call_command("seed_demo")
 
     assert not Organization.objects.exists()
+
+
+@pytest.mark.django_db
+def test_refuses_under_production_environment_even_with_disposable_flag_if_no_admin_password(
+    monkeypatch,
+):
+    monkeypatch.setenv("QUORFIX_DISPOSABLE_DATABASE", "true")
+    monkeypatch.delenv("DEMO_ADMIN_PASSWORD", raising=False)
+
+    with override_settings(ENVIRONMENT="production"):
+        with pytest.raises(CommandError, match="DEMO_ADMIN_PASSWORD"):
+            call_command("seed_demo")
+
+    assert not Organization.objects.exists()
+
+
+@pytest.mark.django_db
+def test_seeds_under_production_environment_with_disposable_flag_and_admin_password(monkeypatch):
+    monkeypatch.setenv("QUORFIX_DISPOSABLE_DATABASE", "true")
+    monkeypatch.setenv("DEMO_ADMIN_PASSWORD", "Sup3r-Uniq7e-Demo-Pass!")
+
+    with override_settings(ENVIRONMENT="production"):
+        call_command("seed_demo")
+
+    organization = Organization.objects.get(slug="quorfix-demo")
+    admin_user = User.objects.get(email="admin@quorfix.local")
+    developer_user = User.objects.get(email="developer@quorfix.local")
+
+    # The administrator's password came from DEMO_ADMIN_PASSWORD, never the
+    # documented development default — that default must not even work.
+    assert admin_user.check_password("Sup3r-Uniq7e-Demo-Pass!")
+    assert not admin_user.check_password("QuorfixDemo2026!")
+
+    # The other four personas are unaffected — same documented passwords as
+    # local development, by design (see PERSONAS' comment in seed_demo.py).
+    assert developer_user.check_password("DeveloperDemo2026!")
+
+    assert OrganizationMembership.objects.filter(organization=organization).count() == 5
 
 
 @pytest.mark.django_db

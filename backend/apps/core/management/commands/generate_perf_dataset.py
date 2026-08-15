@@ -3,11 +3,15 @@
 SAFETY — read before running anywhere but a local disposable database:
 
   * Refuses unconditionally under production settings (ENVIRONMENT ==
-    "production"), matching seed_demo/seed_e2e_*'s own guard.
+    "production") — unlike seed_demo, which may conditionally seed a
+    production-hardened *demo* deployment behind its own explicit
+    DEMO_ADMIN_PASSWORD requirement (see seed_demo.py), this command has no
+    legitimate production use case at all, so there is no override.
   * Refuses unless QUORFIX_DISPOSABLE_DATABASE=true is set in the
-    environment — a variable that exists *only* for this command; a real
-    deployment has no reason to ever set it, so its absence is a strong,
-    purpose-built signal, not a repurposed one.
+    environment — the same purpose-built flag seed_demo also checks (there,
+    only when ENVIRONMENT == "production"; development always seeds
+    freely). A real customer/production deployment has no reason to ever
+    set it, so its absence is a strong signal either command can rely on.
   * Refuses if the target database's own configured NAME looks like a
     production database (contains "prod", case-insensitively) — one
     additional, non-sole signal on top of the two above, since a name check

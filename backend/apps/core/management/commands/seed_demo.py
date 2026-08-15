@@ -1,3 +1,5 @@
+import os
+
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
@@ -6,6 +8,7 @@ from django.utils import timezone
 from apps.bugs.models import Bug, BugStatus
 from apps.bugs.services import assign_bug, create_bug, transition_bug
 from apps.core.demo_data import backdate_bug_history, due_date_days_ago
+from apps.core.env import get_bool
 from apps.organizations.models import (
     CommunityRole,
     Invitation,
@@ -33,8 +36,18 @@ DEMO_ORG_SLUG = "quorfix-demo"
 
 # Fixed, well-known, non-production credentials — intentionally hardcoded so
 # every developer gets the exact same demo login. This command refuses to
-# run under production settings (see _is_production_settings below), so
-# these values are never reachable outside a local/dev database.
+# run under production-hardened settings (ENVIRONMENT == "production") at
+# all unless QUORFIX_DISPOSABLE_DATABASE=true is explicitly set (see
+# _seeding_permitted below) — the same opt-in flag
+# apps.core.management.commands.generate_perf_dataset uses for the same
+# purpose. Even then, the administrator persona's password below is never
+# used as-is: _resolve_personas() requires an explicit DEMO_ADMIN_PASSWORD
+# environment variable and substitutes it in, since that account carries
+# real Django-admin and organization-admin power. The four non-admin
+# personas keep these fixed, documented passwords even on a disposable demo
+# deployment — that's the intended, publicly-documented demo login
+# experience for exploring the product (see docs/ACCESS_AND_TESTING.md),
+# and none of those roles can reach Django admin or manage members.
 PERSONAS = [
     {
         "key": "admin",
@@ -424,33 +437,56 @@ DEMO_BUGS = [
 
 
 def _is_production_settings() -> bool:
-    settings_module = getattr(settings, "SETTINGS_MODULE", "") or ""
-    return settings_module.rsplit(".", 1)[-1] == "production"
+    # Matches apps.core.checks._is_production() and
+    # generate_perf_dataset._is_production_settings() — ENVIRONMENT is set
+    # literally per settings module (never environment-derived), so this
+    # can't be flipped by a stray env var the way parsing SETTINGS_MODULE's
+    # string could be.
+    return settings.ENVIRONMENT == "production"
+
+
+def _seeding_permitted() -> bool:
+    """Development/test may always seed. A production-hardened deployment
+    (the demo included, since it needs the same DEBUG=False/secure-cookie
+    settings as real production) may only seed if it has explicitly opted
+    in via QUORFIX_DISPOSABLE_DATABASE=true — the same flag
+    generate_perf_dataset uses to mean "this specific database holds no
+    real customer data." A real production/customer deployment has no
+    reason to ever set it."""
+    if not _is_production_settings():
+        return True
+    return get_bool("QUORFIX_DISPOSABLE_DATABASE", False)
 
 
 class Command(BaseCommand):
     help = (
-        "Seeds local development demo data: one organization, five demo users "
-        "(one per Community role), and three projects. Idempotent — safe to "
-        "re-run. Refuses to run under production settings, and refuses to run "
-        "if a different organization is already configured (Community allows "
-        "only one)."
+        "Seeds demo data: one organization, five demo users (one per Community "
+        "role), three projects, and sample bugs. Idempotent — safe to re-run. "
+        "Refuses to run under production-hardened settings unless "
+        "QUORFIX_DISPOSABLE_DATABASE=true is explicitly set (and, when it is, "
+        "requires DEMO_ADMIN_PASSWORD instead of the documented development "
+        "admin password). Refuses to run if a different organization is "
+        "already configured (Community allows only one)."
     )
 
     def handle(self, *args, **options):
-        if _is_production_settings():
+        if not _seeding_permitted():
             raise CommandError(
-                "seed_demo refuses to run with production settings "
-                f"(SETTINGS_MODULE={settings.SETTINGS_MODULE!r}). This command creates "
-                "well-known, publicly-documented demo accounts and must never touch a "
-                "production database."
+                "seed_demo refuses to run against a production-hardened deployment "
+                "(ENVIRONMENT='production') unless QUORFIX_DISPOSABLE_DATABASE=true is "
+                "explicitly set in the environment. This command creates well-known, "
+                "publicly-documented demo accounts and must never touch a real "
+                "customer/production database — only set this flag for a dedicated, "
+                "isolated, disposable demo deployment. See docs/ACCESS_AND_TESTING.md."
             )
 
-        organization = self._ensure_organization()
+        personas = self._resolve_personas()
+
+        organization = self._ensure_organization(personas)
 
         users = {}
-        for persona in PERSONAS:
-            users[persona["key"]] = self._ensure_member(organization, persona)
+        for persona in personas:
+            users[persona["key"]] = self._ensure_member(organization, persona, personas)
 
         for spec in DEMO_PROJECTS:
             self._ensure_project(organization, spec, lead=users[spec["lead"]])
@@ -461,17 +497,41 @@ class Command(BaseCommand):
 
         self._ensure_bugs(organization, projects, users, reference_now=timezone.now())
 
-        self._report(organization)
+        self._report(organization, personas)
+
+    def _resolve_personas(self) -> list[dict]:
+        """Returns the persona list to actually seed with. On a
+        production-hardened deployment (the demo), the fixed, publicly-
+        documented QuorfixDemo2026! admin password must never be reachable
+        — this substitutes it for an explicit, deployment-supplied value
+        instead. The other four personas are unaffected; see the PERSONAS
+        comment for why."""
+        if not _is_production_settings():
+            return PERSONAS
+
+        admin_password = os.environ.get("DEMO_ADMIN_PASSWORD", "").strip()
+        if not admin_password:
+            raise CommandError(
+                "DEMO_ADMIN_PASSWORD must be set to seed the administrator account on "
+                "a production-hardened (demo) deployment. The documented "
+                "QuorfixDemo2026! password is for local development only and is never "
+                "used here — set DEMO_ADMIN_PASSWORD to a unique value generated for "
+                "this deployment before seeding."
+            )
+        return [
+            {**persona, "password": admin_password} if persona["key"] == "admin" else persona
+            for persona in PERSONAS
+        ]
 
     # -- organization -----------------------------------------------------
 
-    def _ensure_organization(self) -> Organization:
+    def _ensure_organization(self, personas: list[dict]) -> Organization:
         organization = Organization.objects.filter(slug=DEMO_ORG_SLUG).first()
         if organization is not None:
             self.stdout.write(f"Organization '{organization.slug}' already exists — reusing it.")
             return organization
 
-        admin_persona = next(p for p in PERSONAS if p["key"] == "admin")
+        admin_persona = next(p for p in personas if p["key"] == "admin")
         try:
             _user, organization, _membership = setup_instance(
                 organization_name=DEMO_ORG_NAME,
@@ -506,7 +566,7 @@ class Command(BaseCommand):
 
     # -- members ------------------------------------------------------------
 
-    def _ensure_member(self, organization: Organization, persona: dict):
+    def _ensure_member(self, organization: Organization, persona: dict, personas: list[dict]):
         email = persona["email"].lower()
 
         membership = (
@@ -524,17 +584,19 @@ class Command(BaseCommand):
                 self.stdout.write(f"Member {email} already up to date.")
             return membership.user
 
-        user = self._invite_and_accept(organization, persona, email)
+        user = self._invite_and_accept(organization, persona, email, personas)
         self._sync_persona(user, persona)
         self.stdout.write(f"Created member {email} ({persona['role']}).")
         return user
 
-    def _invite_and_accept(self, organization: Organization, persona: dict, email: str):
+    def _invite_and_accept(
+        self, organization: Organization, persona: dict, email: str, personas: list[dict]
+    ):
         # Goes through the same invite -> accept path a real teammate would,
         # so seeding stays on the business-rule-enforced path (role
         # validation, membership creation) rather than constructing
         # memberships directly.
-        admin_persona = next(p for p in PERSONAS if p["key"] == "admin")
+        admin_persona = next(p for p in personas if p["key"] == "admin")
         invited_by = User.objects.filter(email=admin_persona["email"].lower()).first()
 
         try:
@@ -721,7 +783,7 @@ class Command(BaseCommand):
 
     # -- reporting ------------------------------------------------------
 
-    def _report(self, organization: Organization) -> None:
+    def _report(self, organization: Organization, personas: list[dict]) -> None:
         self.stdout.write("")
         self.stdout.write(
             self.style.SUCCESS(f"Demo data ready for organization '{organization.name}'.")
@@ -744,7 +806,7 @@ class Command(BaseCommand):
         )
         self.stdout.write("")
 
-        rows = [(p["role"], p["email"], p["password"]) for p in PERSONAS]
+        rows = [(p["role"], p["email"], p["password"]) for p in personas]
         role_width = max(len("Role"), *(len(r[0]) for r in rows))
         email_width = max(len("Email"), *(len(r[1]) for r in rows))
         password_width = max(len("Password"), *(len(r[2]) for r in rows))

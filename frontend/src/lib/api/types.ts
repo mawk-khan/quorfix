@@ -25,6 +25,12 @@ export interface Session {
   user: User | null;
   organization: Organization | null;
   role: CommunityRole | null;
+  // Optional in the frontend type even though the backend always sends it
+  // (empty string when unset) — keeps every existing test's mock Session
+  // literal valid without touching each one for an additive, always-safe-
+  // to-omit field. Treat a missing value the same as an empty one: no
+  // banner.
+  demo_banner?: string;
 }
 
 export interface Membership {

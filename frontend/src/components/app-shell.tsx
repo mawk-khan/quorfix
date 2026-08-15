@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { DemoBanner } from "@/components/demo-banner";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { logout } from "@/lib/api/auth";
@@ -66,43 +67,59 @@ export function AppShell({ children }: { children: ReactNode }) {
   // protected page shows no shell for a moment rather than a wrong one.
   const showShell = !isPublicRoute(pathname) && session?.authenticated === true;
 
+  // Rendered on every route, public or authenticated — /setup and /sign-in
+  // are exactly where a demo visitor first decides whether to enter real
+  // information, so the notice must not be limited to the authenticated
+  // shell below. Empty/absent on a normal installation (see
+  // DEMO_BANNER_MESSAGE in config/settings/base.py), so this renders
+  // nothing there.
+  const banner = session?.demo_banner ? <DemoBanner message={session.demo_banner} /> : null;
+
   if (!showShell) {
-    return <>{children}</>;
+    return (
+      <>
+        {banner}
+        {children}
+      </>
+    );
   }
 
   return (
-    <div className="flex min-h-screen">
-      {/* A <nav> landmark, not a bare <a> — a skip link floating directly in
-          the body lands outside every landmark, which axe's "region" rule
-          (correctly) flags: a landmark-navigation user has no way to jump
-          straight to it. Wrapping it in its own labeled nav is the
-          standard fix and costs nothing else — the link's own behavior
-          (focus-visible only, jumps to #main-content) is unchanged. */}
-      <nav aria-label="Skip links">
-        <a
-          href="#main-content"
-          className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-field focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-text-primary focus:shadow-lg focus:outline focus:outline-2 focus:outline-primary"
-        >
-          Skip to main content
-        </a>
-      </nav>
+    <div className="flex min-h-screen flex-col">
+      {banner}
+      <div className="flex min-h-0 flex-1">
+        {/* A <nav> landmark, not a bare <a> — a skip link floating directly in
+            the body lands outside every landmark, which axe's "region" rule
+            (correctly) flags: a landmark-navigation user has no way to jump
+            straight to it. Wrapping it in its own labeled nav is the
+            standard fix and costs nothing else — the link's own behavior
+            (focus-visible only, jumps to #main-content) is unchanged. */}
+        <nav aria-label="Skip links">
+          <a
+            href="#main-content"
+            className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-field focus:bg-surface focus:px-3 focus:py-2 focus:text-sm focus:font-medium focus:text-text-primary focus:shadow-lg focus:outline focus:outline-2 focus:outline-primary"
+          >
+            Skip to main content
+          </a>
+        </nav>
 
-      <Sidebar
-        pathname={pathname}
-        session={session}
-        mobileOpen={mobileNavOpen}
-        onCloseMobile={() => setMobileNavOpen(false)}
-      />
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar
+        <Sidebar
+          pathname={pathname}
           session={session}
-          onOpenMobileNav={() => setMobileNavOpen(true)}
-          onSignOut={handleSignOut}
+          mobileOpen={mobileNavOpen}
+          onCloseMobile={() => setMobileNavOpen(false)}
         />
-        {/* Not <main> — every page already renders its own <main> landmark;
-            nesting a second one here would be an invalid duplicate landmark. */}
-        <div className="min-w-0 flex-1 bg-page">{children}</div>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <TopBar
+            session={session}
+            onOpenMobileNav={() => setMobileNavOpen(true)}
+            onSignOut={handleSignOut}
+          />
+          {/* Not <main> — every page already renders its own <main> landmark;
+              nesting a second one here would be an invalid duplicate landmark. */}
+          <div className="min-w-0 flex-1 bg-page">{children}</div>
+        </div>
       </div>
     </div>
   );
