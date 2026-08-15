@@ -2,12 +2,13 @@
 # pytest 9.1.1: resolves PYSEC-2026-1845 (fixed in 9.0.3+) — see
 # docs/ACCESS_AND_TESTING.md Phase 6 Chunk K.
 pytest==9.1.1
-# pytest-django deliberately NOT bumped to its own latest (4.13.0 at the
-# time): that version has a reproducible incompatibility with pytest 9
-# against this project's suite (AttributeError: 'PytestDjangoTestCase' has
-# no attribute '_pre_setup_ran_eagerly', in pytest_django/fixtures.py).
-# 4.9.0 has no known advisory and works correctly with pytest 9.1.1 — the
-# full suite passes (1065 passed, 1 skipped). Revisit this pin next time
-# pytest-django cuts a release and re-run the full suite before bumping it.
-pytest-django==4.9.0
+# pytest-django 4.9.0 (the previous pin) never declared Django 5.2 support;
+# 4.11.0 added it. Bumped to 4.11.0 specifically (not the latest 4.14.0) —
+# the Django 5.2 upgrade re-verified this version against pytest==9.1.1
+# directly (full suite run, see docs/ACCESS_AND_TESTING.md); the
+# 4.13.0-vs-pytest-9 incompatibility noted previously
+# ('PytestDjangoTestCase' has no attribute '_pre_setup_ran_eagerly') was
+# never fixed upstream in the pytest-django changelog, so later versions
+# aren't assumed safe without the same re-verification.
+pytest-django==4.11.0
 ruff==0.9.4

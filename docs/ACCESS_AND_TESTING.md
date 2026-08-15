@@ -804,6 +804,49 @@ affected by the date range", etc.) — the date filter never silently does nothi
   Every other gate in the audit passed. See this chunk's completion report for the full
   evidence table.
 
+### Django 5.2 LTS security upgrade
+- **Status:** Complete (dependency upgrade + full verification); not committed at time of writing.
+- **Commit:** _(this change — update once committed)_
+- **Main functionality:** `Django` upgraded `5.1.15` → `5.2.17`, resolving 6 CVEs
+  (CVE-2026-48587, CVE-2026-6873, CVE-2026-8404, CVE-2026-48588, CVE-2026-53877,
+  CVE-2026-53878) that `pip-audit` flagged against 5.1.15 — `pip-audit -r requirements.txt`
+  is clean again. Two dependent packages required a compatibility bump, not merely Django
+  itself: `djangorestframework` `3.15.2` → `3.17.0` (3.15.2 never declared Django 5.2 support;
+  3.17.0 adds it while avoiding 3.18.0's list-serializer `many=True` error-shape change, which
+  this project's ~10 `many=True` serializers would have surfaced as a real API behavior change)
+  and `drf-spectacular` `0.28.0` → `0.30.0` (0.28.0 predates Django 5.2 support; 0.29.0 added
+  DRF 3.16+ support but shipped a broken Django 5.2 dependency declaration, fixed only in
+  0.30.0). `pytest-django` (dev-only) bumped `4.9.0` → `4.11.0` (the version that added Django
+  5.2 support), re-verified directly against the existing `pytest==9.1.1` pin rather than
+  trusting changelogs — the previously-noted `4.13.0` incompatibility
+  (`'PytestDjangoTestCase' has no attribute '_pre_setup_ran_eagerly'`) is undocumented upstream,
+  so later versions aren't assumed safe without the same re-verification. No source code
+  changes were required — the one Django-version-sensitive workaround in this codebase
+  (`bugs/migrations/0003_bug_search_trigram_indexes.py`'s hand-corrected `RunSQL`, worked
+  around a Django 5.1 GIN-index SQL generation bug) is immutable, already-applied migration
+  SQL and is unaffected by the framework version now applying it — reconfirmed by a fresh-database
+  migration run under 5.2.17. `django-cors-headers` (`4.6.0`) and `whitenoise` (`6.8.2`)
+  declare support only through Django 5.1 in their classifiers but were verified empirically
+  compatible (full test suite, live dry run) — left unchanged rather than bumped without
+  evidence of an actual incompatibility.
+- **Verification:** `manage.py check` — clean; `makemigrations --check --dry-run` — no drift;
+  full `pytest` — 1078 passed, 1 skipped (exact match to the pre-upgrade baseline, zero
+  regressions); community-isolation tests — 9 passed; OpenAPI schema generation — identical
+  pre-existing warning/error counts, no new ones; frontend (unrelated to this backend-only
+  bump, run anyway) — lint/typecheck/190 unit tests/build/`npm audit` all clean. A full
+  isolated production-settings Docker dry run (`quorfix-dryrun` project, destroyed afterward)
+  confirmed: image build → `collectstatic` → production checks → fresh-database migrate →
+  `seed_demo` in disposable-database mode → both `backend` and `frontend` containers reporting
+  Docker-healthy → live verification of `/api/health/ready/` (including Redis/cache
+  connectivity), `/api/auth/session/` (demo banner propagation), `/api/schema/`+`/api/docs/`
+  (403 anonymous, 200 authenticated), and `/admin/login/` serving correctly with the admin
+  throttle middleware active in the chain.
+- **URLs:** None (no application-facing change).
+- **Known limitations:** Local Playwright E2E remains unrunnable in this environment
+  (`libasound.so.2` and other shared libraries missing, no passwordless sudo — same constraint
+  recorded under Phase 6 Chunk L) — marked NOT RUN, not skipped; required in GitHub Actions
+  before this can be considered a verified release candidate.
+
 ## Manual test checklist
 
 **First-run setup**

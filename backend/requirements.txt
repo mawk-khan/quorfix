@@ -1,7 +1,18 @@
-Django==5.1.15
-djangorestframework==3.15.2
+Django==5.2.17
+# djangorestframework 3.15.2 (the previous pin) never declared Django 5.2
+# support; 3.16.0 added it. Pinned to 3.17.0 rather than the latest 3.18.0
+# deliberately: 3.18.0 changes list-serializer (many=True) validation
+# errors from a list to a dict shape, which this project's ~10 many=True
+# serializers would surface as a real API response-shape change — 3.17.0
+# gets the Django 5.2 support and a UniqueConstraint validator fix without
+# that behavior change. See docs/ACCESS_AND_TESTING.md for the full
+# Django 5.2 upgrade record.
+djangorestframework==3.17.0
 django-cors-headers==4.6.0
-drf-spectacular==0.28.0
+# drf-spectacular 0.28.0 predates Django 5.2 support entirely; 0.29.0 added
+# DRF 3.16+ support but shipped a broken Django 5.2 dependency declaration,
+# fixed only in 0.30.0.
+drf-spectacular==0.30.0
 psycopg[binary]==3.2.4
 celery==5.4.0
 redis==5.2.1
