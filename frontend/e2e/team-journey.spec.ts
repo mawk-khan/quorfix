@@ -74,7 +74,7 @@ test.describe.serial("first-run setup through team management", () => {
     await signIn(page, DEV_EMAIL, DEV_PASSWORD);
     await page.goto("/team");
 
-    await expect(page.getByText(DEV_EMAIL)).toBeVisible();
+    await expect(page.getByRole("cell", { name: DEV_EMAIL })).toBeVisible();
     await expect(page.getByRole("form", { name: /invite a member/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /remove/i })).toHaveCount(0);
   });
