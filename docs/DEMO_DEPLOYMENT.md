@@ -174,3 +174,82 @@ nightly) is decided, but is out of scope here.
   restore data, then the restore script's own forward-migration step brings the schema current,
   so this is safe, but the *content* reverts to whatever the snapshot captured, not the new
   release's seed data, until it's recaptured.
+
+## 5. Operator commands (scripts/demo)
+
+A single operator entry point, `scripts/demo`, wraps the Docker Compose commands, health
+endpoints, and backup script referenced throughout this document into one predictable interface
+— so day-to-day demo operation doesn't require remembering the exact `docker compose` invocation
+each time. It targets `docker-compose.prod.yml` and reuses the exact same `apps.core.checks`
+production hardening, health endpoints (`/api/health/`, `/api/health/ready/`), and
+`scripts/backup.sh`/`scripts/upgrade_smoke.sh` already documented elsewhere in this repo — it
+introduces no new deployment mechanism.
+
+### Prerequisites
+
+- Docker with the `docker compose` v2 plugin.
+- A `.env.demo` file at the repository root (copy `.env.example` and fill it in — see §1's
+  isolation checklist for what must be unique to the demo). It **must** contain the line
+  `QUORFIX_ENV=demo`, verbatim — every `scripts/demo` command refuses to run otherwise. This is
+  an ops-only safety marker read by the script itself, unrelated to any application-level flag
+  (e.g. `QUORFIX_DEMO_MODE`, which gates the Quick Access feature — see
+  `docs/ACCESS_AND_TESTING.md`).
+- `docker-compose.prod.yml` is the default Compose file; override either default with the
+  `COMPOSE_FILE`/`ENV_FILE` environment variables if this deployment doesn't use the standard
+  filenames (e.g. `ENV_FILE=/etc/quorfix-demo/.env.demo scripts/demo status`).
+
+Every command prints which Compose file and env file it resolved to before doing anything.
+
+### Commands
+
+```bash
+scripts/demo deploy    # build images, apply migrations, restart, verify health
+scripts/demo start     # start services (no migrations)
+scripts/demo stop      # stop services — volumes and data are never touched
+scripts/demo restart   # restart services (no migrations, no data loss)
+scripts/demo status    # show service state (docker compose ps)
+scripts/demo health    # liveness/readiness/frontend/migration checks — prints PASS or FAIL
+scripts/demo logs [SERVICE]   # follow logs; SERVICE is one of db, redis, backend, celery_worker, frontend
+scripts/demo backup [DIR]     # coordinated database + attachments backup (default: ~/quorfix-demo-backups)
+scripts/demo help
+```
+
+Typical workflow before and after routine maintenance:
+
+```bash
+scripts/demo backup
+scripts/demo deploy
+scripts/demo health
+```
+
+`scripts/demo deploy` never runs `git pull`, switches branches, or touches Git in any way — the
+administrator or CI prepares the source checkout first, so a deploy is deterministic and
+reproducible from whatever commit is already checked out. It also never seeds or resets demo
+data; run `seed_demo` separately (§2 above), same as always.
+
+### `reset-demo` is intentionally disabled
+
+```text
+$ scripts/demo reset-demo
+ERROR: demo reset is not enabled.
+Guarded reset will be implemented during release Step 4.
+```
+
+This exits non-zero and performs no action whatsoever — no database flush, fixture reload,
+volume deletion, or user recreation. The guarded, deliberate reset procedure described in §4
+above (backup → `restore-db-confirm`/`restore-attachments-confirm`) remains the only supported
+way to reset the demo today; a safer, scripted version of that procedure is planned for a later
+release step, not this one.
+
+### Operational safety notes
+
+- `stop` runs `docker compose stop`, never `docker compose down -v` or anything that removes
+  containers, images, or volumes — `postgres_data`, `redis_data`, and `attachments_data` are
+  never touched by any `scripts/demo` command.
+- `logs` only ever accepts one of the five service names Compose actually defines; anything else
+  is rejected before it ever reaches a `docker compose` invocation.
+- `backup` requires an absolute destination path and refuses to write inside the repository
+  (enforced by `scripts/backup.sh` itself) — see §4's "Demo data reset" for the full recovery-set
+  format it produces.
+- No command loads or evaluates `.env.demo` as shell — it's only ever read by
+  `docker compose --env-file` and grepped for the one `QUORFIX_ENV=demo` line.

@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+# scripts/demo — operator entry point for the Quorfix public demo lifecycle
+# (deploy/start/stop/restart/status/health/logs/backup). See
+# docs/DEMO_DEPLOYMENT.md "Operator commands" for the full guide.
+#
+# Usage:
+#   scripts/demo <command> [args]
+#   scripts/demo help
+#
+# Every command targets docker-compose.prod.yml (default) against an env
+# file named .env.demo (default) — deliberately NOT plain .env, the
+# generic default scripts/backup.sh, scripts/restore_db.sh, and
+# scripts/upgrade_smoke.sh use for any production-shaped deployment. This
+# script exists specifically to operate the demo, so its default steers an
+# operator toward a distinctly-named file rather than one that could also
+# be a real deployment's own .env — see docs/DEMO_DEPLOYMENT.md "Isolation
+# boundary". Override either with the COMPOSE_FILE/ENV_FILE environment
+# variables, e.g.:
+#   ENV_FILE=/path/to/.env.demo scripts/demo status
+#
+# Every command except `help` also requires ENV_FILE to declare
+# QUORFIX_ENV=demo verbatim — see require_demo_env in lib/demo-common.sh.
+
+set -Eeuo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+REPO_ROOT="$(cd -- "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd)"
+
+: "${COMPOSE_FILE:=docker-compose.prod.yml}"
+: "${ENV_FILE:=.env.demo}"
+export COMPOSE_FILE ENV_FILE
+
+# shellcheck source=lib/demo-common.sh
+. "$SCRIPT_DIR/lib/demo-common.sh"
+
+cd -- "$REPO_ROOT"
+
+cmd_help() {
+  cat <<EOF
+Usage:
+  scripts/demo <command> [args]
+
+Commands:
+  deploy         Build/update the demo: build images, migrate, restart, health-check
+  start          Start demo services (no migrations)
+  stop           Stop demo services without deleting data
+  restart        Restart demo services (no migrations, no data loss)
+  status         Show service status
+  health         Run application health checks (liveness/readiness/frontend/migrations)
+  logs [SERVICE] Follow logs — all services, or one of: ${DEMO_SERVICES[*]}
+  backup [DIR]   Create a coordinated database + attachments backup
+  reset-demo     Disabled — guarded reset ships in release Step 4
+  help           Show this message
+
+Environment:
+  COMPOSE_FILE   Compose file to use (default: docker-compose.prod.yml)
+  ENV_FILE       Env file to use (default: .env.demo) — must declare QUORFIX_ENV=demo
+
+See docs/DEMO_DEPLOYMENT.md for the full operational guide.
+EOF
+}
+
+cmd_start() {
+  require_docker
+  print_environment_banner
+  require_demo_env
+  validate_compose_config
+  log "Starting demo services ..."
+  compose up -d
+  log ""
+  log "Service status:"
+  compose ps --all
+}
+
+cmd_stop() {
+  require_docker
+  print_environment_banner
+  require_demo_env
+  log "Stopping demo services (named volumes are not touched) ..."
+  compose stop
+  log "Stopped. postgres_data, redis_data, and attachments_data were left intact."
+}
+
+cmd_restart() {
+  require_docker
+  print_environment_banner
+  require_demo_env
+  log "Restarting demo services ..."
+  compose restart
+  log ""
+  log "Service status:"
+  compose ps --all
+}
+
+cmd_status() {
+  require_docker
+  print_environment_banner
+  require_demo_env
+  compose ps --all
+}
+
+cmd_health() {
+  require_docker
+  print_environment_banner
+  require_demo_env
+  log "Running health checks ..."
+  log ""
+  if "$SCRIPT_DIR/upgrade_smoke.sh" -f "$COMPOSE_FILE" -e "$ENV_FILE"; then
+    log ""
+    echo "PASS"
+    return 0
+  else
+    log ""
+    echo "FAIL"
+    return 1
+  fi
+}
+
+cmd_logs() {
+  require_docker
+  print_environment_banner
+  require_demo_env
+  if [ "$#" -eq 0 ]; then
+    compose logs -f --tail=200
+    return
+  fi
+  service="$1"
+  is_known_service "$service" \
+    || die "unknown service: $service (expected one of: ${DEMO_SERVICES[*]})"
+  compose logs -f --tail=200 "$service"
+}
+
+cmd_backup() {
+  require_docker
+  print_environment_banner
+  require_demo_env
+  dest="${1:-${QUORFIX_DEMO_BACKUP_DIR:-$HOME/quorfix-demo-backups}}"
+  case "$dest" in
+    /*) : ;;
+    *) die "backup destination must be an absolute path (got: $dest) — this avoids ambiguity about whether a relative path is relative to the repo root or your shell's cwd" ;;
+  esac
+  mkdir -p -- "$dest" || die "could not create backup destination: $dest"
+  chmod 750 -- "$dest" 2>/dev/null || true
+  log "Backup destination: $dest"
+  "$SCRIPT_DIR/backup.sh" -f "$COMPOSE_FILE" -e "$ENV_FILE" -- "$dest"
+}
+
+cmd_deploy() {
+  require_docker
+  print_environment_banner
+  require_demo_env
+  validate_compose_config
+
+  log "== Building images =="
+  compose build
+
+  log ""
+  log "== Applying database migrations =="
+  compose run --rm backend python manage.py migrate
+
+  log ""
+  log "== Starting/updating services =="
+  compose up -d
+
+  log ""
+  log "== Health check =="
+  if "$SCRIPT_DIR/upgrade_smoke.sh" -f "$COMPOSE_FILE" -e "$ENV_FILE"; then
+    log ""
+    log "Deploy complete and healthy."
+  else
+    log ""
+    die "Deploy finished but health checks failed — see output above."
+  fi
+}
+
+cmd_reset_demo() {
+  print_environment_banner
+  cat >&2 <<'EOF'
+
+ERROR: demo reset is not enabled.
+Guarded reset will be implemented during release Step 4.
+
+This command performs no action: no database flush, fixture reload, volume
+deletion, or user recreation happens here.
+EOF
+  exit 1
+}
+
+COMMAND="${1:-help}"
+if [ "$#" -gt 0 ]; then
+  shift
+fi
+
+case "$COMMAND" in
+  deploy) cmd_deploy "$@" ;;
+  start) cmd_start "$@" ;;
+  stop) cmd_stop "$@" ;;
+  restart) cmd_restart "$@" ;;
+  status) cmd_status "$@" ;;
+  health) cmd_health "$@" ;;
+  logs) cmd_logs "$@" ;;
+  backup) cmd_backup "$@" ;;
+  reset-demo) cmd_reset_demo "$@" ;;
+  help | --help | -h) cmd_help ;;
+  *)
+    echo "Unknown command: $COMMAND" >&2
+    echo "" >&2
+    cmd_help >&2
+    exit 2
+    ;;
+esac
