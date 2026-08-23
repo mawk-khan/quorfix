@@ -9,6 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.text import slugify
 
+from apps.accounts.services import DEMO_ORGANIZATION_SLUG, is_demo_user
 from apps.organizations.models import (
     CommunityRole,
     Invitation,
@@ -22,6 +23,16 @@ User = get_user_model()
 
 
 class SetupAlreadyCompleted(Exception):
+    pass
+
+
+class ProtectedDemoAccountError(Exception):
+    """Raised when an operation would mutate one of the five seeded Quorfix
+    Demo personas' identity/role/membership, or would add a new member to
+    the demo organization. Applies regardless of who is calling — including
+    an administrator-role demo persona acting on itself or another persona
+    — see apps.accounts.services.is_demo_user."""
+
     pass
 
 
@@ -103,8 +114,30 @@ def setup_instance(
 
 @transaction.atomic
 def create_invitation(
-    *, organization: Organization, invited_by, email: str, role: str
+    *,
+    organization: Organization,
+    invited_by,
+    email: str,
+    role: str,
+    bypass_demo_protection: bool = False,
 ) -> tuple[Invitation, str]:
+    # The demo organization's membership is a fixed, publicly-documented set
+    # of five personas (see apps.accounts.services) — adding a sixth, real
+    # account to it (which also sends email to an address the caller
+    # doesn't have to own, see the view) is exactly the kind of persistent,
+    # unbounded state a shared public demo must not accumulate. Blocked
+    # entirely rather than only for the five reserved emails, since any new
+    # member is equally unwanted here, not just a collision with an
+    # existing persona.
+    #
+    # bypass_demo_protection exists for exactly one caller:
+    # apps.core.management.commands.seed_demo, the trusted, operator-invoked
+    # tool that creates these five personas via this exact code path in the
+    # first place (see that command's _invite_and_accept) — never set True
+    # from any HTTP-reachable code. No view ever passes this parameter.
+    if organization.slug == DEMO_ORGANIZATION_SLUG and not bypass_demo_protection:
+        raise ProtectedDemoAccountError()
+
     email = email.lower()
 
     if OrganizationMembership.objects.filter(organization=organization, user__email=email).exists():
@@ -220,10 +253,22 @@ def _remaining_administrators(memberships: list[OrganizationMembership], excludi
 
 @transaction.atomic
 def change_member_role(
-    *, membership: OrganizationMembership, new_role: str
+    *,
+    membership: OrganizationMembership,
+    new_role: str,
+    bypass_demo_protection: bool = False,
 ) -> OrganizationMembership:
     org_memberships = _lock_organization_memberships(membership.organization_id)
     membership = next(m for m in org_memberships if m.pk == membership.pk)
+    # Checked before (and independently of) LastAdministratorError below —
+    # a demo persona's role must never change even when the target isn't
+    # the last administrator, regardless of who's asking (including an
+    # administrator-role demo persona acting on itself or a peer persona).
+    # bypass_demo_protection: see create_invitation's identical parameter —
+    # the same single trusted caller (seed_demo, reconverging a persona's
+    # role after it drifted), never set True from any HTTP-reachable code.
+    if is_demo_user(membership.user) and not bypass_demo_protection:
+        raise ProtectedDemoAccountError()
     if membership.role == CommunityRole.ADMINISTRATOR and new_role != CommunityRole.ADMINISTRATOR:
         if _remaining_administrators(org_memberships, excluding_pk=membership.pk) == 0:
             raise LastAdministratorError()
@@ -236,6 +281,8 @@ def change_member_role(
 def remove_member(*, membership: OrganizationMembership) -> None:
     org_memberships = _lock_organization_memberships(membership.organization_id)
     membership = next(m for m in org_memberships if m.pk == membership.pk)
+    if is_demo_user(membership.user):
+        raise ProtectedDemoAccountError()
     if membership.role == CommunityRole.ADMINISTRATOR:
         if _remaining_administrators(org_memberships, excluding_pk=membership.pk) == 0:
             raise LastAdministratorError()

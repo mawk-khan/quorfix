@@ -578,7 +578,16 @@ class Command(BaseCommand):
         if membership is not None:
             self._sync_persona(membership.user, persona)
             if membership.role != persona["role"]:
-                membership = change_member_role(membership=membership, new_role=persona["role"])
+                # bypass_demo_protection=True: this command owns these five
+                # personas — apps.organizations.services blocks any other
+                # caller from changing a demo persona's role at all (see
+                # apps.accounts.services.is_demo_user), which would
+                # otherwise make role-drift reconvergence impossible here.
+                membership = change_member_role(
+                    membership=membership,
+                    new_role=persona["role"],
+                    bypass_demo_protection=True,
+                )
                 self.stdout.write(f"Updated role for {email} -> {persona['role']}.")
             else:
                 self.stdout.write(f"Member {email} already up to date.")
@@ -599,9 +608,19 @@ class Command(BaseCommand):
         admin_persona = next(p for p in personas if p["key"] == "admin")
         invited_by = User.objects.filter(email=admin_persona["email"].lower()).first()
 
+        # bypass_demo_protection=True at both call sites below: this command
+        # is the one place that legitimately creates the five demo personas
+        # via the invite -> accept path — apps.organizations.services
+        # otherwise blocks every invitation into the "quorfix-demo"
+        # organization (see apps.accounts.services.DEMO_ORGANIZATION_SLUG),
+        # which would make first-time seeding impossible without it.
         try:
             _invitation, raw_token = create_invitation(
-                organization=organization, invited_by=invited_by, email=email, role=persona["role"]
+                organization=organization,
+                invited_by=invited_by,
+                email=email,
+                role=persona["role"],
+                bypass_demo_protection=True,
             )
         except MemberAlreadyExists:
             # Became a member between the check in _ensure_member and here.
@@ -620,7 +639,11 @@ class Command(BaseCommand):
             )
             revoke_invitation(invitation=stale)
             _invitation, raw_token = create_invitation(
-                organization=organization, invited_by=invited_by, email=email, role=persona["role"]
+                organization=organization,
+                invited_by=invited_by,
+                email=email,
+                role=persona["role"],
+                bypass_demo_protection=True,
             )
 
         user, _membership = accept_invitation(

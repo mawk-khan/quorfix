@@ -44,12 +44,28 @@ SECURE_HSTS_PRELOAD = True
 # apps.core.checks.check_https_proxy_header (quorfix.E008).
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+# apps.core.mail.DemoMailSinkBackend wraps this exact SMTP backend and
+# rewrites every message's recipients to QUORFIX_DEMO_MAIL_SINK before
+# sending — see that module's docstring and docs/DEMO_DEPLOYMENT.md "Mail
+# sink" for why the public demo must never be able to deliver mail to an
+# arbitrary external address (e.g. via POST /api/invitations/'s
+# admin-issued, attacker-choosable recipient). Inert (identical to today)
+# when QUORFIX_DEMO_MODE is false, which is every non-demo deployment.
+EMAIL_BACKEND = (
+    "apps.core.mail.DemoMailSinkBackend"
+    if QUORFIX_DEMO_MODE  # noqa: F405
+    else "django.core.mail.backends.smtp.EmailBackend"
+)
 EMAIL_HOST = os.environ.get("EMAIL_HOST", "")
 EMAIL_PORT = get_int("EMAIL_PORT", 587)
 EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
 EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
 EMAIL_USE_TLS = get_bool("EMAIL_USE_TLS", True)
+
+# Required, non-empty, when QUORFIX_DEMO_MODE is true — validated by
+# apps.core.checks.check_email (quorfix.E013). The single mailbox every
+# demo-triggered message is redirected to; never a real customer's address.
+QUORFIX_DEMO_MAIL_SINK = os.environ.get("QUORFIX_DEMO_MAIL_SINK", "").strip()
 
 # Hashed, compressed filenames (cache-busting) + gzip/brotli precompression,
 # resolved from the manifest `collectstatic` writes into STATIC_ROOT at

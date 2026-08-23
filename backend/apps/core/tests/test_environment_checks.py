@@ -194,6 +194,54 @@ class TestEmail:
         username/password — this must not be forced to look configured."""
         assert checks.check_email(None) == []
 
+    @override_settings(
+        ENVIRONMENT="production",
+        EMAIL_BACKEND="apps.core.mail.DemoMailSinkBackend",
+        EMAIL_HOST="",
+    )
+    def test_demo_sink_backend_without_host_rejected(self):
+        # The sink wraps real SMTP — it needs EMAIL_HOST exactly like the
+        # plain SMTP backend does.
+        assert [e.id for e in checks.check_email(None)] == ["quorfix.E006"]
+
+    @override_settings(
+        ENVIRONMENT="production",
+        EMAIL_BACKEND="apps.core.mail.DemoMailSinkBackend",
+        EMAIL_HOST="smtp.example.com",
+    )
+    def test_demo_sink_backend_with_host_accepted(self):
+        assert checks.check_email(None) == []
+
+
+class TestDemoMailSink:
+    @override_settings(ENVIRONMENT="production", QUORFIX_DEMO_MODE=False)
+    def test_inert_when_demo_mode_disabled(self):
+        assert checks.check_demo_mail_sink(None) == []
+
+    @override_settings(ENVIRONMENT="production", QUORFIX_DEMO_MODE=True, QUORFIX_DEMO_MAIL_SINK="")
+    def test_missing_sink_rejected(self):
+        assert [e.id for e in checks.check_demo_mail_sink(None)] == ["quorfix.E013"]
+
+    @override_settings(
+        ENVIRONMENT="production", QUORFIX_DEMO_MODE=True, QUORFIX_DEMO_MAIL_SINK="not-an-email"
+    )
+    def test_implausible_sink_rejected(self):
+        assert [e.id for e in checks.check_demo_mail_sink(None)] == ["quorfix.E013"]
+
+    @override_settings(
+        ENVIRONMENT="production", QUORFIX_DEMO_MODE=True, QUORFIX_DEMO_MAIL_SINK="@example.com"
+    )
+    def test_sink_missing_local_part_rejected(self):
+        assert [e.id for e in checks.check_demo_mail_sink(None)] == ["quorfix.E013"]
+
+    @override_settings(
+        ENVIRONMENT="production",
+        QUORFIX_DEMO_MODE=True,
+        QUORFIX_DEMO_MAIL_SINK="ops@example.com",
+    )
+    def test_valid_sink_accepted(self):
+        assert checks.check_demo_mail_sink(None) == []
+
 
 class TestCookies:
     _SAFE_COOKIE_BASE = dict(

@@ -1,4 +1,6 @@
 import pytest
+from django.core.cache import cache
+from rest_framework.throttling import ScopedRateThrottle
 
 from apps.organizations.models import CommunityRole, Organization, OrganizationMembership
 
@@ -98,6 +100,32 @@ class TestMembershipMutations:
 
         response = admin_client.patch(f"/api/members/{second_admin.pk}/", {"role": "developer"})
         assert response.status_code == 200
+
+
+@pytest.mark.django_db
+class TestMembershipThrottling:
+    def test_repeated_mutations_are_throttled(
+        self, admin_client, organization, make_user, make_membership, monkeypatch
+    ):
+        monkeypatch.setitem(ScopedRateThrottle.THROTTLE_RATES, "membership-mutation", "1/min")
+        cache.clear()
+        developer = make_user("dev@example.com")
+        membership = make_membership(organization, developer, role=CommunityRole.DEVELOPER)
+
+        first = admin_client.patch(f"/api/members/{membership.pk}/", {"role": "qa"})
+        second = admin_client.patch(f"/api/members/{membership.pk}/", {"role": "viewer"})
+
+        assert first.status_code == 200
+        assert second.status_code == 429
+
+    def test_list_is_not_subject_to_the_mutation_scope(self, admin_client, monkeypatch):
+        # Listing is a cheap, frequently-polled GET — must not share the
+        # mutation scope's tight budget.
+        monkeypatch.setitem(ScopedRateThrottle.THROTTLE_RATES, "membership-mutation", "1/min")
+        cache.clear()
+        for _ in range(3):
+            response = admin_client.get("/api/members/")
+            assert response.status_code == 200
 
 
 @pytest.mark.django_db

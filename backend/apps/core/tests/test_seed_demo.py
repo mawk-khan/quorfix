@@ -368,11 +368,16 @@ def test_recovers_from_a_stale_pending_invitation_left_by_an_interrupted_run():
     # assertions below.
     reporter_membership.delete()
     Invitation.objects.filter(organization=organization, email="reporter@quorfix.local").delete()
+    # bypass_demo_protection=True: this call simulates seed_demo's own
+    # interrupted-run recovery path (see apps.organizations.services.
+    # create_invitation's docstring) — a real, non-seed_demo caller could
+    # never do this against the demo organization.
     create_invitation(
         organization=organization,
         invited_by=admin_user,
         email="reporter@quorfix.local",
         role=CommunityRole.REPORTER,
+        bypass_demo_protection=True,
     )
     assert (
         Invitation.objects.filter(

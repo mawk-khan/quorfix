@@ -69,3 +69,27 @@ def resolve_demo_login_user(role: str) -> OrganizationMembership | None:
         )
         .first()
     )
+
+
+def is_demo_user(user) -> bool:
+    """True iff `user` is one of the five seeded Quorfix Demo personas —
+    the same double allow-list check as resolve_demo_login_user (exact
+    email AND membership in the org slugged "quorfix-demo"), evaluated
+    independently of how the caller authenticated. Unlike
+    resolve_demo_login_user, this is NOT gated on settings.QUORFIX_DEMO_MODE
+    or on role: it exists purely to protect these five accounts' identity,
+    role, and membership from mutation — see
+    apps.organizations.services.change_member_role/remove_member/
+    create_invitation — regardless of whether Quick Access is currently
+    enabled, and regardless of which role the caller is acting as (an
+    administrator-role demo persona must not be able to modify itself or
+    any other demo persona either).
+    """
+    if user is None or not getattr(user, "is_authenticated", False):
+        return False
+    email = (user.email or "").lower()
+    if email not in DEMO_ROLE_TO_EMAIL.values():
+        return False
+    return OrganizationMembership.objects.filter(
+        user=user, organization__slug=DEMO_ORGANIZATION_SLUG
+    ).exists()

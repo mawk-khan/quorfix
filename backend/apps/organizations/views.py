@@ -30,6 +30,7 @@ from apps.organizations.services import (
     InvitationInvalid,
     LastAdministratorError,
     MemberAlreadyExists,
+    ProtectedDemoAccountError,
     SetupAlreadyCompleted,
     SetupNotAllowed,
     accept_invitation,
@@ -135,6 +136,14 @@ class MembershipViewSet(GenericViewSet):
             return [IsOrganizationMember()]
         return [IsOrganizationAdministrator()]
 
+    def get_throttles(self):
+        # list is a cheap, frequently-polled GET; only the mutating actions
+        # (role change, removal) get the scope — see docs/SECURITY.md "Rate
+        # limiting".
+        if self.action in ("partial_update", "destroy"):
+            self.throttle_scope = "membership-mutation"
+        return super().get_throttles()
+
     def list(self, request):
         memberships = get_organization_members(request.organization)
         page = self.paginate_queryset(memberships)
@@ -155,6 +164,12 @@ class MembershipViewSet(GenericViewSet):
                 {"detail": "An organization must have at least one administrator."},
                 status=status.HTTP_409_CONFLICT,
             )
+        except ProtectedDemoAccountError:
+            logger.warning("Membership role change rejected: protected demo account")
+            return Response(
+                {"detail": "This account cannot be modified."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         return Response(MembershipSerializer(membership).data)
 
     def destroy(self, request, pk=None):
@@ -165,6 +180,12 @@ class MembershipViewSet(GenericViewSet):
             return Response(
                 {"detail": "An organization must have at least one administrator."},
                 status=status.HTTP_409_CONFLICT,
+            )
+        except ProtectedDemoAccountError:
+            logger.warning("Membership removal rejected: protected demo account")
+            return Response(
+                {"detail": "This account cannot be modified."},
+                status=status.HTTP_403_FORBIDDEN,
             )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -210,6 +231,12 @@ class InvitationViewSet(GenericViewSet):
             return Response(
                 {"detail": "An invitation is already pending for this email."},
                 status=status.HTTP_409_CONFLICT,
+            )
+        except ProtectedDemoAccountError:
+            logger.warning("Invitation creation rejected: protected demo organization")
+            return Response(
+                {"detail": "Inviting new members is not available in this organization."},
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         invite_url = f"{settings.FRONTEND_BASE_URL}/invitations/{raw_token}"

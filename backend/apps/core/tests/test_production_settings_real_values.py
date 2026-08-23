@@ -95,20 +95,20 @@ def _print_real_settings_script() -> str:
         "    'SECURE_SSL_REDIRECT': settings.SECURE_SSL_REDIRECT,\n"
         "    'SECURE_CONTENT_TYPE_NOSNIFF': settings.SECURE_CONTENT_TYPE_NOSNIFF,\n"
         "    'X_FRAME_OPTIONS': settings.X_FRAME_OPTIONS,\n"
+        "    'SESSION_COOKIE_AGE': settings.SESSION_COOKIE_AGE,\n"
+        "    'MAX_ATTACHMENT_SIZE_BYTES': settings.MAX_ATTACHMENT_SIZE_BYTES,\n"
+        "    'EMAIL_BACKEND': settings.EMAIL_BACKEND,\n"
         "}))\n"
     )
 
 
-def test_real_production_settings_have_exact_expected_cookie_and_security_values():
-    """Reads the real, committed values directly off config.settings.production
-    (via `python -c`, a separate process — Django only supports one active
-    settings module per process) rather than re-deriving them, so a future
-    accidental edit to production.py is caught here even if every
-    apps.core.checks function were somehow also broken at the same time."""
+def _real_settings_values(env_overrides: dict | None = None) -> dict:
     import os
 
     env = dict(os.environ)
     env.update(_VALID_PRODUCTION_ENV)
+    if env_overrides:
+        env.update(env_overrides)
     result = subprocess.run(
         [sys.executable, "-c", _print_real_settings_script()],
         cwd=BACKEND_DIR,
@@ -118,7 +118,16 @@ def test_real_production_settings_have_exact_expected_cookie_and_security_values
         timeout=30,
     )
     assert result.returncode == 0, f"stdout: {result.stdout}\nstderr: {result.stderr}"
-    values = json.loads(result.stdout)
+    return json.loads(result.stdout)
+
+
+def test_real_production_settings_have_exact_expected_cookie_and_security_values():
+    """Reads the real, committed values directly off config.settings.production
+    (via `python -c`, a separate process — Django only supports one active
+    settings module per process) rather than re-deriving them, so a future
+    accidental edit to production.py is caught here even if every
+    apps.core.checks function were somehow also broken at the same time."""
+    values = _real_settings_values()
 
     assert values["DEBUG"] is False
     assert values["SESSION_COOKIE_SECURE"] is True
@@ -132,3 +141,43 @@ def test_real_production_settings_have_exact_expected_cookie_and_security_values
     assert values["SECURE_SSL_REDIRECT"] is True
     assert values["SECURE_CONTENT_TYPE_NOSNIFF"] is True
     assert values["X_FRAME_OPTIONS"] == "DENY"
+    # Neither demo-only override applies to an ordinary production
+    # deployment (QUORFIX_DEMO_MODE unset/false in _VALID_PRODUCTION_ENV) —
+    # Django's own two-week session default and the standard 10 MB
+    # attachment cap, real SMTP delivery.
+    assert values["SESSION_COOKIE_AGE"] == 1209600
+    assert values["MAX_ATTACHMENT_SIZE_BYTES"] == 10 * 1024 * 1024
+    assert values["EMAIL_BACKEND"] == "django.core.mail.backends.smtp.EmailBackend"
+
+
+def test_real_production_settings_apply_demo_hardening_when_demo_mode_enabled():
+    """Step 3 (public-demo hardening): with QUORFIX_DEMO_MODE=true and a
+    valid QUORFIX_DEMO_MAIL_SINK, the real production settings module must
+    actually apply the shortened session lifetime, the tightened attachment
+    cap, and the mail-sink email backend — and still pass manage.py check
+    (proving quorfix.E013 doesn't itself block a correctly-configured demo)."""
+    env_overrides = {
+        "QUORFIX_DEMO_MODE": "true",
+        "QUORFIX_DEMO_MAIL_SINK": "ops@example.test",
+    }
+    check_result = _run_manage(["check"], env_overrides=env_overrides)
+    assert check_result.returncode == 0, (
+        f"stdout: {check_result.stdout}\nstderr: {check_result.stderr}"
+    )
+
+    values = _real_settings_values(env_overrides)
+    assert values["SESSION_COOKIE_AGE"] == 4 * 60 * 60
+    assert values["MAX_ATTACHMENT_SIZE_BYTES"] == 2 * 1024 * 1024
+    assert values["EMAIL_BACKEND"] == "apps.core.mail.DemoMailSinkBackend"
+    # Every other production hardening value is unaffected by demo mode.
+    assert values["SESSION_COOKIE_SECURE"] is True
+    assert values["DEBUG"] is False
+
+
+def test_real_production_settings_demo_mode_without_mail_sink_fails_check():
+    """Sanity check on the check above: QUORFIX_DEMO_MODE=true with no
+    QUORFIX_DEMO_MAIL_SINK must fail manage.py check (quorfix.E013) rather
+    than silently booting with mail sent nowhere useful."""
+    result = _run_manage(["check"], env_overrides={"QUORFIX_DEMO_MODE": "true"})
+    assert result.returncode != 0
+    assert "quorfix.E013" in result.stdout + result.stderr

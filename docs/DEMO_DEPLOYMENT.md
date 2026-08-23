@@ -253,3 +253,54 @@ release step, not this one.
   format it produces.
 - No command loads or evaluates `.env.demo` as shell — it's only ever read by
   `docker compose --env-file` and grepped for the one `QUORFIX_ENV=demo` line.
+
+## 6. Security hardening for this deployment
+
+Full rationale for everything below lives in [`docs/SECURITY.md`](./SECURITY.md) — this section
+is only the concrete checklist for standing up `.env.demo` and the edge in front of it. Nothing
+here is a substitute for reading that document.
+
+### Required in `.env.demo`
+
+In addition to `QUORFIX_DEMO_MODE=true` and `QUORFIX_ENV=demo` (§5):
+
+```bash
+QUORFIX_DEMO_MAIL_SINK=<a mailbox an operator actually reads>
+```
+
+Required — `manage.py check` fails (`quorfix.E013`) at container startup without it. Every
+demo-triggered email (invitation attempts, notification email) is redirected here instead of its
+real recipient; see `docs/SECURITY.md` "Mail sink (public demo)".
+
+### Optional overrides
+
+Sane defaults apply if left unset — only set these if this host's actual resources or risk
+tolerance genuinely need something different (see `docs/SECURITY.md` "Container resource
+limits", "Session lifetime (public demo)", "Upload policy (public demo)"):
+
+```bash
+QUORFIX_DEMO_SESSION_COOKIE_AGE_SECONDS=   # default 4 hours
+QUORFIX_DEMO_MAX_ATTACHMENT_SIZE_BYTES=    # default 2 MB
+QUORFIX_DB_MEM_LIMIT= QUORFIX_DB_CPUS= QUORFIX_DB_PIDS_LIMIT=
+QUORFIX_REDIS_MEM_LIMIT= QUORFIX_REDIS_CPUS= QUORFIX_REDIS_PIDS_LIMIT=
+QUORFIX_BACKEND_MEM_LIMIT= QUORFIX_BACKEND_CPUS= QUORFIX_BACKEND_PIDS_LIMIT=
+QUORFIX_CELERY_MEM_LIMIT= QUORFIX_CELERY_CPUS= QUORFIX_CELERY_PIDS_LIMIT=
+QUORFIX_FRONTEND_MEM_LIMIT= QUORFIX_FRONTEND_CPUS= QUORFIX_FRONTEND_PIDS_LIMIT=
+QUORFIX_LOG_MAX_SIZE= QUORFIX_LOG_MAX_FILES=
+```
+
+### What's already enforced by the application/Compose file (no operator action needed)
+
+- The five Quick Access personas' role/membership can never be changed or removed via the API,
+  and no sixth member can be invited into the demo organization — see `docs/SECURITY.md`
+  "Immutable demo personas".
+- `db`/`redis`/`backend`/`celery_worker` publish no host port; only `frontend` does.
+- Every service has a bounded memory/CPU/PID ceiling and bounded log rotation.
+
+### Requires operator action — Cloudflare / edge WAF
+
+**Not configured by anything in this repository, and cannot be** — see `docs/SECURITY.md` "Edge
+/ Cloudflare WAF (public demo)" for the exact managed-WAF, bot-protection, per-path rate-limit,
+and origin-protection requirements for whoever owns `demo.quorfix.com`'s Cloudflare zone. Treat
+that section as a checklist to complete before `demo.quorfix.com` goes live, not as already done
+because this file exists.

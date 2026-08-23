@@ -192,6 +192,11 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.ScopedRateThrottle",
+        # Demo-only blanket mutation throttle — inert (no-op) unless
+        # QUORFIX_DEMO_MODE is on; see apps.core.throttling.DemoMutationThrottle
+        # for why this is layered on top of (never a replacement for) the
+        # scoped throttles below.
+        "apps.core.throttling.DemoMutationThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
         "login": "10/min",
@@ -212,6 +217,15 @@ REST_FRAMEWORK = {
         # docs/SECURITY.md for why.
         "invitation-create": "20/hour",
         "attachment-upload": "30/min",
+        # Public-demo hardening additions — see docs/SECURITY.md "Rate
+        # limiting". membership-mutation applies unconditionally (a
+        # genuine, previously-unthrottled gap independent of demo mode —
+        # role changes/removals are inherently rare administrative actions,
+        # so this doesn't affect normal use). demo-mutation is read only by
+        # apps.core.throttling.DemoMutationThrottle, which ignores this
+        # value entirely unless QUORFIX_DEMO_MODE is on.
+        "membership-mutation": "30/min",
+        "demo-mutation": "40/min",
     },
 }
 
@@ -239,6 +253,15 @@ DEMO_BANNER_MESSAGE = os.environ.get("DEMO_BANNER_MESSAGE", "").strip()
 # frontend rebuild — only restarting the backend with the new value.
 QUORFIX_DEMO_MODE = get_bool("QUORFIX_DEMO_MODE", False)
 
+# A public, shared demo session living for Django's default two weeks
+# (SESSION_COOKIE_AGE's own default) is needlessly long-lived for a
+# throwaway exploration session on a shared machine/browser — shortened to
+# a few hours only when QUORFIX_DEMO_MODE is on. Unset (Django's default)
+# for every ordinary installation, matching every other demo-only setting
+# here.
+if QUORFIX_DEMO_MODE:
+    SESSION_COOKIE_AGE = get_int("QUORFIX_DEMO_SESSION_COOKIE_AGE_SECONDS", 4 * 60 * 60)
+
 # Comments: how long after posting an author may still edit/delete their own
 # comment. Administrators are not bound by this window.
 COMMENT_EDIT_WINDOW_MINUTES = 15
@@ -253,7 +276,18 @@ COMMENT_EDIT_WINDOW_MINUTES = 15
 # a scheme meant to work the same way inside a future S3 bucket, where
 # "attachments/" would be one prefix among possibly several). Rooting here at
 # .../media/attachments too would nest an "attachments/attachments/..." path.
-MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
+# Tightened for the public demo (2 MB instead of 10 MB) — a shared,
+# anonymous-reachable instance has a much smaller reasonable disk/bandwidth
+# budget per upload than a trusted internal deployment; every other
+# attachment protection (content-type allowlist, magic-byte verification,
+# server-generated storage keys — see apps.attachments.validators) is
+# unchanged and applies identically either way. QUORFIX_DEMO_MODE-only;
+# every ordinary installation keeps the original 10 MB limit.
+MAX_ATTACHMENT_SIZE_BYTES = (
+    get_int("QUORFIX_DEMO_MAX_ATTACHMENT_SIZE_BYTES", 2 * 1024 * 1024)
+    if QUORFIX_DEMO_MODE
+    else 10 * 1024 * 1024
+)
 ATTACHMENTS_LOCAL_ROOT = os.environ.get("ATTACHMENTS_LOCAL_ROOT", str(BASE_DIR / "media"))
 
 # Email (invitations). Backend and SMTP credentials are set per-environment.

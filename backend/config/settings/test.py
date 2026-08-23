@@ -35,6 +35,8 @@ REST_FRAMEWORK = {  # noqa: F405
         "invitation-accept": "1000/min",
         "invitation-create": "1000/min",
         "attachment-upload": "1000/min",
+        "membership-mutation": "1000/min",
+        "demo-mutation": "1000/min",
     },
 }
 

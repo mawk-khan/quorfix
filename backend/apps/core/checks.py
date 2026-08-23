@@ -21,6 +21,7 @@ Stable check-ID registry (never renumber an existing ID — only append):
     quorfix.E010  Redis cache/broker URL missing or not a redis(s):// URL
     quorfix.E011  ATTACHMENTS_LOCAL_ROOT missing, relative, or a temp path
     quorfix.E012  ANALYTICS_CACHE_TTL_SECONDS out of the production-sane range
+    quorfix.E013  QUORFIX_DEMO_MAIL_SINK missing or not a plausible email, while demo mode is on
 
 No check here ever includes a secret value (SECRET_KEY, database/SMTP/Redis
 passwords) in its message — only the name of the environment variable to set.
@@ -45,6 +46,15 @@ _UNSAFE_PRODUCTION_EMAIL_BACKENDS = frozenset(
     {
         "django.core.mail.backends.console.EmailBackend",
         "django.core.mail.backends.locmem.EmailBackend",
+    }
+)
+
+# Both require a real EMAIL_HOST underneath — apps.core.mail.DemoMailSinkBackend
+# is a thin wrapper around the plain SMTP backend, not a different transport.
+_SMTP_SHAPED_EMAIL_BACKENDS = frozenset(
+    {
+        "django.core.mail.backends.smtp.EmailBackend",
+        "apps.core.mail.DemoMailSinkBackend",
     }
 )
 
@@ -249,11 +259,11 @@ def check_email(app_configs, **kwargs):
                 id="quorfix.E006",
             )
         )
-    elif backend == "django.core.mail.backends.smtp.EmailBackend":
+    elif backend in _SMTP_SHAPED_EMAIL_BACKENDS:
         if not getattr(settings, "EMAIL_HOST", ""):
             errors.append(
                 Error(
-                    "EMAIL_BACKEND is the SMTP backend but EMAIL_HOST is not set. "
+                    f"EMAIL_BACKEND is {backend!r} but EMAIL_HOST is not set. "
                     "Set EMAIL_HOST to the SMTP relay's address. (EMAIL_HOST_USER/"
                     "EMAIL_HOST_PASSWORD are not required here — some relays "
                     "authenticate without them.)",
@@ -261,6 +271,34 @@ def check_email(app_configs, **kwargs):
                 )
             )
     return errors
+
+
+def check_demo_mail_sink(app_configs, **kwargs):
+    """QUORFIX_DEMO_MODE's mail sink (apps.core.mail.DemoMailSinkBackend) is
+    only meaningful with a real, configured recipient — an empty or
+    malformed QUORFIX_DEMO_MAIL_SINK would mean every demo-triggered
+    message either fails to send or (worse) silently goes nowhere, which
+    defeats the whole point of "verify the sink actually works" as well as
+    the sink's own safety guarantee. A no-op unless demo mode is enabled,
+    same as every other demo-only setting in this project."""
+    if not _is_production() or not getattr(settings, "QUORFIX_DEMO_MODE", False):
+        return []
+    sink = getattr(settings, "QUORFIX_DEMO_MAIL_SINK", "") or ""
+    # Deliberately not Django's full EmailValidator — this only needs to
+    # catch "empty" and "obviously not an email", not RFC-perfect
+    # validation; a stricter check would mean this system check itself
+    # would need to stay in lockstep with Django's own validator forever.
+    if not sink or "@" not in sink or sink.startswith("@") or sink.endswith("@"):
+        return [
+            Error(
+                "QUORFIX_DEMO_MODE is enabled but QUORFIX_DEMO_MAIL_SINK is not set "
+                "to a plausible email address. Every demo-triggered email is "
+                "redirected there (see apps.core.mail.DemoMailSinkBackend) — set "
+                "QUORFIX_DEMO_MAIL_SINK to an operator-controlled mailbox.",
+                id="quorfix.E013",
+            )
+        ]
+    return []
 
 
 def check_cookies(app_configs, **kwargs):
@@ -481,6 +519,7 @@ _ALL_CHECKS = (
     check_redis,
     check_attachments_root,
     check_analytics_cache_ttl,
+    check_demo_mail_sink,
 )
 
 

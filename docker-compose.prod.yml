@@ -21,6 +21,19 @@
 # carries no existing-deployment compatibility constraint.
 name: quorfix-prod
 
+# Shared, bounded JSON-file log rotation for every service — without this,
+# Docker's default logging driver keeps every container's stdout/stderr
+# forever, which for a long-lived public demo is an unbounded disk-fill
+# vector on its own (independent of anything application-level). 10 MB per
+# file, 3 files kept (30 MB/container max) is generous for debugging while
+# still bounded; override per-service via the env vars below if a
+# deployment needs more history.
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "${QUORFIX_LOG_MAX_SIZE:-10m}"
+    max-file: "${QUORFIX_LOG_MAX_FILES:-3}"
+
 services:
   db:
     image: postgres:16-alpine
@@ -41,6 +54,17 @@ services:
     restart: unless-stopped
     # No host port published — only `backend`/`celery_worker`, on the same
     # Compose network, ever need to reach Postgres.
+    # Resource ceilings (see docs/DEMO_DEPLOYMENT.md "Container resource
+    # limits" for the full rationale and how to size these for a real host)
+    # — bounds what one abused/misbehaving service can consume, never so
+    # tight that ordinary demo traffic becomes unstable. Compose applies
+    # these directly under `docker compose up`; Swarm's `deploy:` key is
+    # deliberately not used since this file is never deployed via
+    # `docker stack deploy`.
+    mem_limit: ${QUORFIX_DB_MEM_LIMIT:-512m}
+    cpus: ${QUORFIX_DB_CPUS:-1.0}
+    pids_limit: ${QUORFIX_DB_PIDS_LIMIT:-200}
+    logging: *default-logging
 
   redis:
     image: redis:7-alpine
@@ -66,6 +90,10 @@ services:
     restart: unless-stopped
     # No host port published — Redis is never meant to be reachable from
     # outside the Docker host.
+    mem_limit: ${QUORFIX_REDIS_MEM_LIMIT:-256m}
+    cpus: ${QUORFIX_REDIS_CPUS:-0.5}
+    pids_limit: ${QUORFIX_REDIS_PIDS_LIMIT:-50}
+    logging: *default-logging
 
   backend:
     # Local tag by default — this Compose file builds it itself (below),
@@ -143,6 +171,10 @@ services:
     # No host port published — the frontend is the sole edge service; it
     # reaches the backend over the internal Compose network via
     # BACKEND_INTERNAL_URL, never through a published port.
+    mem_limit: ${QUORFIX_BACKEND_MEM_LIMIT:-512m}
+    cpus: ${QUORFIX_BACKEND_CPUS:-1.0}
+    pids_limit: ${QUORFIX_BACKEND_PIDS_LIMIT:-200}
+    logging: *default-logging
 
   celery_worker:
     image: quorfix-backend:${VERSION:-local}
@@ -195,6 +227,10 @@ services:
     # with its own retry/backoff timing) before exiting, which can
     # legitimately take longer than an HTTP request.
     stop_grace_period: 60s
+    mem_limit: ${QUORFIX_CELERY_MEM_LIMIT:-512m}
+    cpus: ${QUORFIX_CELERY_CPUS:-1.0}
+    pids_limit: ${QUORFIX_CELERY_PIDS_LIMIT:-100}
+    logging: *default-logging
 
   frontend:
     image: quorfix-frontend:${VERSION:-local}
@@ -226,6 +262,10 @@ services:
     restart: unless-stopped
     ports:
       - "3000:3000"
+    mem_limit: ${QUORFIX_FRONTEND_MEM_LIMIT:-512m}
+    cpus: ${QUORFIX_FRONTEND_CPUS:-1.0}
+    pids_limit: ${QUORFIX_FRONTEND_PIDS_LIMIT:-100}
+    logging: *default-logging
 
 volumes:
   postgres_data:

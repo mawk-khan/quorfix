@@ -87,6 +87,91 @@ class TestDemoLoginValidation:
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("enable_demo_mode")
+class TestDemoLoginMaliciousPayloads:
+    """Section 6 of the public-demo hardening pass: the role allow-list
+    (DemoLoginSerializer's ChoiceField, backed by
+    apps.accounts.services.DEMO_ROLE_TO_EMAIL) must reject every value
+    below with a plain 400 — never a 500, never a session, and never a
+    response that echoes the payload back."""
+
+    @pytest.mark.parametrize(
+        "role",
+        [
+            "admin",
+            "superuser",
+            "staff",
+            "../../admin",
+            "developer'",
+            "developer OR 1=1",
+            "developer;drop table users;",
+            "unknown-role",
+            "ADMINISTRATOR",  # case must not be normalized into a match
+            " developer",  # leading whitespace
+            "developer ",  # trailing whitespace
+            "developer\x00",  # embedded NUL
+            "a" * 10_000,  # oversized string
+        ],
+    )
+    def test_malformed_role_strings_are_rejected(self, api_client, role):
+        response = api_client.post(DEMO_LOGIN_URL, {"role": role})
+        assert response.status_code == 400
+        assert "_auth_user_id" not in api_client.session
+
+    @pytest.mark.parametrize(
+        "role",
+        [
+            None,
+            123,
+            0,
+            True,
+            ["developer"],
+            {"role": "developer"},
+            3.14,
+        ],
+    )
+    def test_non_string_role_values_are_rejected(self, api_client, role):
+        # format="json": the default multipart test-client encoding can't
+        # represent None or a nested dict at all (it would raise its own
+        # TypeError/AssertionError before the request is even sent) — a
+        # real client sending malformed JSON hits the view directly, so
+        # this is what the test actually needs to exercise.
+        response = api_client.post(DEMO_LOGIN_URL, {"role": role}, format="json")
+        assert response.status_code == 400
+        assert "_auth_user_id" not in api_client.session
+
+    def test_numeric_user_id_field_is_rejected(self, api_client, make_demo_persona):
+        user = make_demo_persona(CommunityRole.ADMINISTRATOR)
+        response = api_client.post(DEMO_LOGIN_URL, {"user_id": 1})
+        assert response.status_code == 400
+        assert "_auth_user_id" not in api_client.session
+        # Confirms the numeric id wasn't coincidentally usable as a pk match.
+        assert str(user.id) != "1"
+
+    def test_email_address_as_role_is_rejected(self, api_client, make_demo_persona):
+        make_demo_persona(CommunityRole.ADMINISTRATOR)
+        response = api_client.post(DEMO_LOGIN_URL, {"role": "admin@quorfix.local"})
+        assert response.status_code == 400
+        assert "_auth_user_id" not in api_client.session
+
+    def test_empty_body_is_rejected(self, api_client):
+        response = api_client.post(DEMO_LOGIN_URL, None, content_type="application/json")
+        assert response.status_code == 400
+
+    def test_sql_shaped_role_is_rejected_without_crashing(self, api_client):
+        # A plain 400 (DRF's ChoiceField validation, which safely echoes the
+        # rejected value back as a string) — never a 500, and never any
+        # sign the string reached a raw query: no traceback, no SQL error
+        # text, no table name from the DB engine's own error output.
+        response = api_client.post(DEMO_LOGIN_URL, {"role": "'; SELECT * FROM accounts_user;--"})
+        assert response.status_code == 400
+        body = response.content.decode()
+        assert "Traceback" not in body
+        assert "psycopg" not in body
+        assert "syntax error" not in body.lower()
+
+
+@pytest.mark.django_db
+@pytest.mark.usefixtures("enable_demo_mode")
 class TestDemoLoginSuccess:
     @pytest.mark.parametrize(
         "role",
