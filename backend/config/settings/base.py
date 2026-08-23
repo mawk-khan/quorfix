@@ -227,6 +227,18 @@ FRONTEND_BASE_URL = os.environ.get("FRONTEND_BASE_URL", "http://localhost:3000")
 # the frontend renders it as text, never as HTML.
 DEMO_BANNER_MESSAGE = os.environ.get("DEMO_BANNER_MESSAGE", "").strip()
 
+# Demo-only "Quick Access" role login (apps.accounts.views.DemoLoginView,
+# apps.accounts.services.resolve_demo_login_user) — lets a public demo
+# visitor sign in as one of five fixed Community personas without ever
+# touching a password. Defaults False and MUST stay False for an ordinary
+# Community installation; only a dedicated, disposable public demo
+# deployment (e.g. demo.quorfix.com — see docs/DEMO_DEPLOYMENT.md) sets this
+# to true. Surfaced to the frontend via SessionSerializer's `demo_mode`
+# field (same session-response pattern as DEMO_BANNER_MESSAGE above) rather
+# than a NEXT_PUBLIC_* build-time variable, so toggling it never requires a
+# frontend rebuild — only restarting the backend with the new value.
+QUORFIX_DEMO_MODE = get_bool("QUORFIX_DEMO_MODE", False)
+
 # Comments: how long after posting an author may still edit/delete their own
 # comment. Administrators are not bound by this window.
 COMMENT_EDIT_WINDOW_MINUTES = 15

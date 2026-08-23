@@ -31,6 +31,11 @@ export interface Session {
   // to-omit field. Treat a missing value the same as an empty one: no
   // banner.
   demo_banner?: string;
+  // settings.QUORFIX_DEMO_MODE, echoed back authoritatively — never a
+  // NEXT_PUBLIC_* build-time variable, so toggling it server-side never
+  // requires a frontend rebuild. Optional here for the same reason as
+  // demo_banner above; missing/undefined means disabled.
+  demo_mode?: boolean;
 }
 
 export interface Membership {

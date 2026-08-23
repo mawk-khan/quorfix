@@ -259,7 +259,7 @@ Audited in Phase 6 Chunk G. Current throttle scopes
 
 | Scope | Rate | Why |
 | --- | --- | --- |
-| `login` | 10/min | Credential-stuffing/brute-force resistance. |
+| `login` | 10/min | Credential-stuffing/brute-force resistance. Shared with the demo-only `POST /api/auth/demo-login/` (see `docs/ACCESS_AND_TESTING.md` "Demo Quick Access (role login)") rather than giving it an independent budget. |
 | `setup` | 3/hour | First-run instance setup — a one-time action per installation. |
 | `setup-status` | 60/min | Cheap polling GET, loosely bounded. |
 | `invitation-lookup` | 30/min | Public, unauthenticated token lookup. |

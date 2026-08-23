@@ -52,8 +52,19 @@ demo — no self-registration was added or is planned for this deployment. Concr
 - Every other demo account either comes from `seed_demo`'s five fixed personas (documented in
   [`docs/ACCESS_AND_TESTING.md`](./ACCESS_AND_TESTING.md)) or from an admin-issued invitation.
 - An anonymous visitor cannot create their own account. If the demo is meant to let arbitrary
-  visitors explore the product hands-on, the intended path is signing in with one of the
-  documented, shared `seed_demo` persona logins — not registering their own.
+  visitors explore the product hands-on, the intended path is signing in with one of those five
+  fixed personas — not registering their own.
+
+**Quick Access (`QUORFIX_DEMO_MODE=true`)** is the actual mechanism visitors use for that path on
+a public instance like this one — see
+[`docs/ACCESS_AND_TESTING.md`](./ACCESS_AND_TESTING.md#demo-quick-access-role-login) for the full
+description. It authenticates a visitor as one of the five personas above by role, never by
+password (the visitor never sees, needs, or can extract any password — including the
+`DEMO_ADMIN_PASSWORD` this document already treats as sensitive, see §1). It's a separate flag
+from `QUORFIX_DISPOSABLE_DATABASE` above: enabling it doesn't seed or reset any data by itself,
+and it must be set in this deployment's own `.env` (never copied from, or shared with, a real
+installation's `.env` — same rule as every other value in §1). Defaults to `false`; a real
+customer/production deployment has no reason to ever set it.
 
 Building real self-registration is future Professional/Community work, out of scope for this
 deployment.

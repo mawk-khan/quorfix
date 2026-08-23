@@ -13,6 +13,7 @@ class TestSessionView:
             "organization": None,
             "role": None,
             "demo_banner": "",
+            "demo_mode": False,
         }
 
     def test_authenticated_includes_user_organization_and_role(
@@ -46,3 +47,12 @@ class TestSessionView:
         # is most useful exactly there, not only once already signed in.
         response = api_client.get("/api/auth/session/")
         assert response.json()["demo_banner"] == "Demo data may be reset at any time."
+
+    def test_demo_mode_is_false_by_default(self, api_client):
+        response = api_client.get("/api/auth/session/")
+        assert response.json()["demo_mode"] is False
+
+    @override_settings(QUORFIX_DEMO_MODE=True)
+    def test_demo_mode_is_surfaced_when_enabled(self, api_client):
+        response = api_client.get("/api/auth/session/")
+        assert response.json()["demo_mode"] is True

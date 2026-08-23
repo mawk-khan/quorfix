@@ -44,14 +44,15 @@ vi.mock("@/lib/api/auth", () => ({
   logout: vi.fn(),
 }));
 
-import { getSession } from "@/lib/api/auth";
+import { getSession, logout } from "@/lib/api/auth";
 
 function mockAuthenticated(overrides: Partial<Session> = {}): void {
   vi.mocked(getSession).mockResolvedValue({
     authenticated: true,
     role: "administrator",
     user: { id: "u1", email: "admin@example.com", first_name: "Ada", last_name: "Admin" },
-    organization: { id: "o1", name: "Acme" },
+    organization: { id: "o1", name: "Acme", slug: "acme" },
+    demo_mode: false,
     ...overrides,
   } as Session);
 }
@@ -177,5 +178,68 @@ describe("AppShell", () => {
       "Demo data may be reset at any time.",
     );
     expect(screen.getByText("sign-in page")).toBeInTheDocument();
+  });
+
+  it("does not render the demo persona banner for an ordinary organization, even with demo mode enabled", async () => {
+    mockAuthenticated({ demo_mode: true });
+    renderWithProviders(
+      <AppShell>
+        <main id="main-content" tabIndex={-1} />
+      </AppShell>,
+    );
+
+    await screen.findByRole("link", { name: "Bugs" });
+    expect(screen.queryByText(/public demo/i)).not.toBeInTheDocument();
+  });
+
+  it("does not render the demo persona banner for a quorfix-demo org when demo mode is disabled", async () => {
+    mockAuthenticated({
+      demo_mode: false,
+      organization: { id: "o1", name: "Quorfix Demo", slug: "quorfix-demo" },
+    });
+    renderWithProviders(
+      <AppShell>
+        <main id="main-content" tabIndex={-1} />
+      </AppShell>,
+    );
+
+    await screen.findByRole("link", { name: "Bugs" });
+    expect(screen.queryByText(/public demo/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the demo persona banner with the authenticated role for a demo persona", async () => {
+    mockAuthenticated({
+      demo_mode: true,
+      role: "developer",
+      organization: { id: "o1", name: "Quorfix Demo", slug: "quorfix-demo" },
+    });
+    renderWithProviders(
+      <AppShell>
+        <main id="main-content" tabIndex={-1} />
+      </AppShell>,
+    );
+
+    expect(await screen.findByText(/public demo/i)).toBeInTheDocument();
+    expect(screen.getByText(/exploring quorfix as developer/i)).toBeInTheDocument();
+  });
+
+  it("switch role logs out and returns to sign-in", async () => {
+    mockAuthenticated({
+      demo_mode: true,
+      role: "viewer",
+      organization: { id: "o1", name: "Quorfix Demo", slug: "quorfix-demo" },
+    });
+    vi.mocked(logout).mockResolvedValueOnce(undefined);
+    renderWithProviders(
+      <AppShell>
+        <main id="main-content" tabIndex={-1} />
+      </AppShell>,
+    );
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole("button", { name: /switch role/i }));
+
+    expect(logout).toHaveBeenCalled();
+    expect(pushMock).toHaveBeenCalledWith("/sign-in");
   });
 });

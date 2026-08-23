@@ -66,6 +66,7 @@ class SessionView(APIView):
             "organization": organization,
             "role": membership.role if membership else None,
             "demo_banner": settings.DEMO_BANNER_MESSAGE,
+            "demo_mode": settings.QUORFIX_DEMO_MODE,
         }
         return Response(SessionSerializer(data).data)
 

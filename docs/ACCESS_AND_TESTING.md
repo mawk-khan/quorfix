@@ -155,6 +155,45 @@ every status, priority, and severity, backdated across roughly the previous 45 d
 dashboard (see below) has a meaningful trend to chart — and prints these credentials to the
 console on each run (development settings only).
 
+## Demo Quick Access (role login)
+
+A second, entirely separate way to sign in as one of the five personas above — **without ever
+using or knowing their password**. `POST /api/auth/demo-login/` (`apps/accounts/views.py`'s
+`DemoLoginView`) accepts `{"role": "developer"}` and, if that role is one of `administrator`,
+`developer`, `qa`, `reporter`, `viewer`, starts a normal session for the one fixed account that
+role maps to — the same session mechanism (Django session cookie, CSRF-protected) as
+`POST /api/auth/login/`. It never reads, checks, or has access to any account's password.
+
+**Off by default, everywhere, including local development.** Set `QUORFIX_DEMO_MODE=true` to
+enable it — the endpoint returns `404 Not Found` while disabled, so it doesn't advertise its own
+existence. This is a distinct flag from `QUORFIX_DISPOSABLE_DATABASE` (which only governs
+destructive seeding commands, see above) and from `DEMO_BANNER_MESSAGE` (a plain, unrelated
+site-wide notice) — enabling Quick Access does not seed any data by itself; run `seed_demo`
+separately first, same as always. The frontend's sign-in page shows the "Explore Quorfix" role
+selector only when the backend reports `demo_mode: true` on `GET /api/auth/session/` — this is a
+backend-owned, session-response flag (like `demo_banner`), not a `NEXT_PUBLIC_*` build-time
+variable, so toggling it never requires rebuilding the frontend image, only restarting the
+backend container with the new value.
+
+The endpoint enforces a strict, hardcoded role → email allow-list
+(`apps/accounts/services.py`'s `DEMO_ROLE_TO_EMAIL`) — it only ever authenticates as the five
+accounts above, only when they belong to the organization slugged `quorfix-demo`, only when their
+membership role actually matches the requested role, only when the account is active, and never
+if the account is somehow a Django staff/superuser (defense-in-depth for the administrator
+persona specifically). Shares `LoginView`'s `login` throttle scope (see `docs/SECURITY.md` "Rate
+limiting").
+
+When signed in as one of these five personas with demo mode enabled, the app shows a small
+persistent "Public demo" banner naming the current role, with a "Switch role" control that signs
+out and returns to the role selector — see `apps/organizations/serializers.py`'s
+`SessionSerializer` (`role`/`organization`) for how that's derived; it is never read from
+anything the browser stored on its own.
+
+Intended only for a dedicated, disposable, shared public demo instance (e.g. `demo.quorfix.com` —
+see `docs/DEMO_DEPLOYMENT.md`), never for a normal Community installation or for local
+development day-to-day — leave `QUORFIX_DEMO_MODE` unset/false unless you're specifically testing
+this feature.
+
 ## Backend admin (Django) access
 
 No account is seeded with `is_staff`/`is_superuser` by default — none of `seed_demo`,
@@ -181,7 +220,7 @@ install.
 
 ## E2E fixture accounts (for manual review)
 
-Two additional, independently-namespaced account sets exist purely for the Playwright suite,
+Three additional, independently-namespaced account sets exist purely for the Playwright suite,
 but work identically for manual sign-in and are often the fastest way to poke at a specific
 role without touching your own `seed_demo` data. **Development-only, same production refusal
 guarantee as `seed_demo`.**
@@ -191,9 +230,10 @@ Seed them with:
 ```bash
 docker compose exec backend python manage.py seed_e2e_bug_fixture
 docker compose exec backend python manage.py seed_e2e_analytics_fixture
+docker compose exec backend python manage.py seed_e2e_demo_login_fixture
 ```
 
-Both are idempotent and safe to run alongside `seed_demo` — each seeds its organization with
+All three are idempotent and safe to run alongside `seed_demo` — each seeds its organization with
 `is_active=False`, which is the one flag Community's single-active-organization check
 (`OrganizationPolicy.can_create_additional_organization()`) looks at, so these fixtures never
 trip `seed_demo`'s "a different organization already exists" refusal or count against the
@@ -221,6 +261,24 @@ across every status — useful for exercising the dashboard without waiting on d
 | QA | analytics-e2e-qa@example.com | AnalyticsE2EPass123! |
 | Reporter | analytics-e2e-reporter@example.com | AnalyticsE2EPass123! |
 | Viewer | analytics-e2e-viewer@example.com | AnalyticsE2EPass123! |
+
+**Quorfix Demo** (`quorfix-demo`) — from `seed_e2e_demo_login_fixture`, backing
+`e2e/demo-login.spec.ts`. Same organization slug and email addresses as `seed_demo`'s personas
+(see "Demo Quick Access (role login)" above) — the exact accounts `POST /api/auth/demo-login/`
+requires — so running this fixture on a database that already has a `seed_demo` install simply
+reuses what's already there instead of creating a duplicate:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Administrator | admin@quorfix.local | DemoLoginE2EPass123! |
+| Developer | developer@quorfix.local | DemoLoginE2EPass123! |
+| QA | qa@quorfix.local | DemoLoginE2EPass123! |
+| Reporter | reporter@quorfix.local | DemoLoginE2EPass123! |
+| Viewer | viewer@quorfix.local | DemoLoginE2EPass123! |
+
+(Only meaningful if these accounts didn't already exist from a `seed_demo` run — an existing
+account's password is left untouched. `e2e/demo-login.spec.ts` never uses passwords at all; this
+table is only for manual email/password sign-in convenience.)
 
 If you're seeding these on a database the E2E suite has also touched (rather than a plain
 `seed_demo` install), reset `SetupLock` the same way `frontend/e2e/global-setup.ts` does before

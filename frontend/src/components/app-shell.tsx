@@ -4,10 +4,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { DemoBanner } from "@/components/demo-banner";
+import { DemoPersonaBanner } from "@/components/demo-persona-banner";
 import { Sidebar } from "@/components/sidebar";
 import { TopBar } from "@/components/top-bar";
 import { logout } from "@/lib/api/auth";
 import { useSession } from "@/lib/auth/session-provider";
+import { demoRoleLabel, isDemoPersonaSession } from "@/lib/demo";
 
 // Routes that must never show authenticated chrome, checked by pathname
 // alone (synchronous, no session round-trip) so there is no window in which
@@ -75,6 +77,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   // nothing there.
   const banner = session?.demo_banner ? <DemoBanner message={session.demo_banner} /> : null;
 
+  // Distinct from the generic banner above — only shown inside the
+  // authenticated shell (a demo persona identity is meaningless before
+  // sign-in), and only when the backend's demo mode is actually enabled, not
+  // merely because an organization happens to be slugged "quorfix-demo".
+  const demoPersonaBanner =
+    showShell && session?.demo_mode === true && session.role && isDemoPersonaSession(session) ? (
+      <DemoPersonaBanner roleLabel={demoRoleLabel(session.role)} onSwitchRole={handleSignOut} />
+    ) : null;
+
   if (!showShell) {
     return (
       <>
@@ -87,6 +98,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
       {banner}
+      {demoPersonaBanner}
       <div className="flex min-h-0 flex-1">
         {/* A <nav> landmark, not a bare <a> — a skip link floating directly in
             the body lands outside every landmark, which axe's "region" rule

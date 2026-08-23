@@ -36,4 +36,12 @@ export default function globalSetup() {
   // duration of this Playwright run (see the command's own docstring for
   // the wall-clock-midnight safety margins).
   run("docker compose exec -T backend python manage.py seed_e2e_analytics_fixture");
+  // Seeds the "Quorfix Demo" organization/personas for
+  // e2e/demo-login.spec.ts. Cheap and harmless to seed unconditionally like
+  // the two fixtures above — that spec itself skips at runtime (rather than
+  // failing the run) if QUORFIX_DEMO_MODE isn't also enabled for this
+  // backend, since flipping that flag requires restarting the backend
+  // container, not something this suite does on its own. See
+  // docs/ACCESS_AND_TESTING.md "Demo Quick Access (role login)".
+  run("docker compose exec -T backend python manage.py seed_e2e_demo_login_fixture");
 }

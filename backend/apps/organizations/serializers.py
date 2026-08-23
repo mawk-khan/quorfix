@@ -30,6 +30,11 @@ class SessionSerializer(serializers.Serializer):
     organization = OrganizationSerializer(allow_null=True)
     role = serializers.CharField(allow_null=True)
     demo_banner = serializers.CharField(allow_blank=True)
+    # settings.QUORFIX_DEMO_MODE, echoed back so the frontend's role
+    # selector (Quick Access) can be gated on the same authoritative,
+    # backend-owned flag — never a NEXT_PUBLIC_* build-time variable. See
+    # that setting's own comment in config/settings/base.py.
+    demo_mode = serializers.BooleanField()
 
 
 class InvitationSerializer(serializers.ModelSerializer):
