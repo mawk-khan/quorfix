@@ -449,10 +449,48 @@ Also verified directly: `db` publishes no host port, credentials come entirely f
 start if `POSTGRES_PASSWORD` is unset), and the schema/data volume persists normally across
 restarts (`postgres_data`, untouched by `scripts/demo stop`/`restart` — see
 `docs/DEMO_DEPLOYMENT.md`). The demo database user is the same single role every Community
-deployment uses (no separate reduced-privilege role exists for any deployment shape yet); no
-destructive reset exists anywhere in the lifecycle tooling shipped so far (`scripts/demo
-reset-demo` is intentionally disabled — see `docs/DEMO_DEPLOYMENT.md` — pending a guarded,
-purpose-built reset mechanism in a later release step).
+deployment uses (no separate reduced-privilege role exists for any deployment shape yet).
+`scripts/demo reset-demo` (see "Guarded demo reset" below) is the one destructive-by-design
+command in this codebase — every deletion it performs is scoped by an explicit `organization=`
+filter, never a table truncation or `DROP DATABASE`.
+
+## Guarded demo reset
+
+`scripts/demo reset-demo --confirm` / `backend/apps/core/management/commands/
+reset_public_demo.py` restores the public demo to its canonical state. Full operational
+detail — manual/scheduled invocation, cadence, backup policy, failure recovery — lives in
+`docs/DEMO_DEPLOYMENT.md` §7, "Guarded automatic demo reset"; this section is the security
+summary.
+
+- **Independent guard layers**: `--confirm-demo-reset`, `QUORFIX_DEMO_MODE=true`,
+  `QUORFIX_DEMO_RESET_ENABLED=true` (a second, independent flag — enabling Quick Access login
+  alone never also enables reset), the `quorfix-demo` organization actually existing, and
+  (transitively, via the internal `seed_demo` call) `QUORFIX_DISPOSABLE_DATABASE=true`. All
+  five must independently hold; refusing any one of them touches no data at all.
+- **Concurrency**: a PostgreSQL session-scoped advisory lock
+  (`apps.core.pg_advisory_lock.DEMO_RESET_LOCK_KEY`) — the first named advisory lock in this
+  codebase (existing coordination elsewhere uses row-level `select_for_update()`, e.g.
+  `SetupLock`). A second concurrent reset attempt refuses immediately rather than queuing; a
+  crashed reset's lock releases automatically when PostgreSQL drops its connection, so it can
+  never wedge the demo permanently unavailable for reset.
+- **Atomicity**: the entire reset (delete → repair/reseed → verify) runs inside one
+  `transaction.atomic()` block, with verification happening *before* commit — a verification
+  failure rolls back every change made so far rather than ever reporting success on unverified
+  state.
+- **Scope**: every deletion is filtered by `organization=<the demo organization>`. Non-demo
+  users, staff/superuser accounts (even ones incorrectly associated with the demo organization),
+  and every other organization's data are structurally unreachable — see
+  `backend/apps/core/tests/test_reset_public_demo.py`'s `TestPreservation` class for the
+  automated proof.
+- **Brief write-lock window**: `apps.core.demo_reset_guard.DemoResetInProgressPermission`
+  (added to `REST_FRAMEWORK`'s `DEFAULT_PERMISSION_CLASSES`, inert unless
+  `QUORFIX_DEMO_MODE=true`) returns `503` for mutating requests only while a reset is actually
+  running — closing the window for a visitor's write to land between the delete and reseed
+  phases, without needing reset-awareness inside every service module individually.
+- **No throttle-counter reset**: a reset never touches Redis's throttle-counter keys — an
+  abusive client cannot use a scheduled reset to refresh its own rate-limit budget. See
+  "Rate limiting" above and `docs/DEMO_DEPLOYMENT.md` §7 "Cache / Redis cleanup" for the full
+  reasoning.
 
 ## Logging hardening
 

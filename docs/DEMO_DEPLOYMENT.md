@@ -99,17 +99,20 @@ deployment.
   first deployment; every account on it is either a fixed demo persona or admin-recoverable via
   the shell snippet above.
 
-## 4. Demo data reset
+## 4. Demo data reset (heavy: full snapshot restore)
 
-**The existing seed + backup/restore architecture is already sufficient for a safe, repeatable
-demo reset — no new destructive command was written for this.** `seed_demo` is idempotent (see
+**For routine/scheduled resets, use `scripts/demo reset-demo` instead — see §7.** This section's
+golden-snapshot restore procedure is the *heavier* alternative: a full database/attachments
+replacement from a point-in-time backup, useful as a disaster-recovery fallback (e.g. if the
+demo's data somehow reaches a state `scripts/demo reset-demo`'s application-aware reset can't
+cleanly recover from) or when the canonical seed dataset itself changes and needs recapturing.
+It reuses the same hardened backup/restore path documented in `docs/BACKUP_AND_RESTORE.md`
+rather than new, independently-risky code — `seed_demo` is idempotent (see
 `backend/apps/core/tests/test_seed_demo.py`), and `scripts/restore_db.sh`/
-`scripts/restore_attachments.sh` (see `docs/BACKUP_AND_RESTORE.md`) are already exactly
-"stop writes → replace the database wholesale → migrate → restart", already tested
+`scripts/restore_attachments.sh` are already exactly "stop writes → replace the database
+wholesale → migrate → restart", already tested
 (`scripts/tests/test_backup_restore_guards.sh`), and already require an explicit
-`--confirm-restore` flag plus a checksum-verified dump. Reusing them for the demo reset means
-the reset relies on the same hardened path as disaster recovery, rather than new,
-independently-risky code.
+`--confirm-restore` flag plus a checksum-verified dump.
 
 ### One-time: capture a golden snapshot
 
@@ -153,11 +156,10 @@ direct database/attachment access of its own, so a brief backend/worker outage d
 the only visible interruption, and typically finishes in well under a minute for a dataset this
 size.
 
-**Not yet built: an automatic schedule.** Per this pass's scope, no cron/scheduled job runs the
-above automatically — an operator (or a scheduled CI/ops job, added separately when the demo is
-actually deployed) triggers a reset manually using the two commands above. Automating that
-schedule is a reasonable next step once the demo is live and an actual reset cadence (e.g.
-nightly) is decided, but is out of scope here.
+**This snapshot-restore procedure remains manual-only, deliberately** — it is the heavy,
+whole-database fallback, not the routine reset (see §7 for the scheduled/automatic mechanism).
+An operator triggers it manually using the two commands above only when §7's lighter reset isn't
+the right tool (see this section's opening paragraph).
 
 ### Safety notes
 
@@ -211,6 +213,7 @@ scripts/demo status    # show service state (docker compose ps)
 scripts/demo health    # liveness/readiness/frontend/migration checks — prints PASS or FAIL
 scripts/demo logs [SERVICE]   # follow logs; SERVICE is one of db, redis, backend, celery_worker, frontend
 scripts/demo backup [DIR]     # coordinated database + attachments backup (default: ~/quorfix-demo-backups)
+scripts/demo reset-demo --confirm   # guarded reset to canonical demo state — see §7
 scripts/demo help
 ```
 
@@ -226,20 +229,6 @@ scripts/demo health
 administrator or CI prepares the source checkout first, so a deploy is deterministic and
 reproducible from whatever commit is already checked out. It also never seeds or resets demo
 data; run `seed_demo` separately (§2 above), same as always.
-
-### `reset-demo` is intentionally disabled
-
-```text
-$ scripts/demo reset-demo
-ERROR: demo reset is not enabled.
-Guarded reset will be implemented during release Step 4.
-```
-
-This exits non-zero and performs no action whatsoever — no database flush, fixture reload,
-volume deletion, or user recreation. The guarded, deliberate reset procedure described in §4
-above (backup → `restore-db-confirm`/`restore-attachments-confirm`) remains the only supported
-way to reset the demo today; a safer, scripted version of that procedure is planned for a later
-release step, not this one.
 
 ### Operational safety notes
 
@@ -303,4 +292,195 @@ QUORFIX_LOG_MAX_SIZE= QUORFIX_LOG_MAX_FILES=
 / Cloudflare WAF (public demo)" for the exact managed-WAF, bot-protection, per-path rate-limit,
 and origin-protection requirements for whoever owns `demo.quorfix.com`'s Cloudflare zone. Treat
 that section as a checklist to complete before `demo.quorfix.com` goes live, not as already done
-because this file exists.
+because this file exists. **This remains outstanding regardless of how thoroughly §7's reset
+mechanism below is exercised or scheduled — application/data hardening and edge/network
+hardening are separate, both-required layers.**
+
+## 7. Guarded automatic demo reset
+
+`scripts/demo reset-demo --confirm` restores the public demo to its canonical state: the five
+Quick Access personas, the `Quorfix Demo` organization, the three canonical projects, and the 24
+canonical seed bugs — while removing every visitor-created bug, comment, attachment, project,
+tag, invitation, and non-canonical membership. See `backend/apps/core/management/commands/
+reset_public_demo.py`'s own module docstring for the exact, authoritative step-by-step list; this
+section is the operator-facing summary and the parts of the design that live outside that file
+(scheduling, backup policy, session/cache/Celery behavior).
+
+### Manual reset
+
+```bash
+scripts/demo reset-demo --confirm
+```
+
+`--confirm` is an operational guard against a stray keystroke, not authentication — the real
+safety conditions below are enforced by the backend command itself and hold regardless of this
+flag. Exits non-zero and prints `DEMO RESET FAIL` on any failure (a guard refusal, a lock
+conflict, a mid-reset error, or a post-reset health check failure); prints `DEMO RESET PASS` and
+exits 0 only once the canonical state has been verified and the application is confirmed
+healthy afterward (`scripts/demo health`, i.e. `scripts/upgrade_smoke.sh`).
+
+### Scheduled reset
+
+No specific host/scheduler is assumed. `scripts/demo reset-demo --confirm` is non-interactive and
+safe to call repeatedly (idempotent canonical state, and the reset lock below prevents overlap),
+so any of the following work — pick whichever this deployment already uses for other periodic
+jobs:
+
+**Host cron** (adjust `<deployment-path>` to wherever this checkout actually lives on the host;
+never hardcode a path this repository can't know):
+
+```cron
+0 */6 * * * cd <deployment-path> && ./scripts/demo reset-demo --confirm >> /var/log/quorfix-demo-reset.log 2>&1
+```
+
+**systemd timer** (`/etc/systemd/system/quorfix-demo-reset.service`):
+
+```ini
+[Unit]
+Description=Quorfix public demo reset
+
+[Service]
+Type=oneshot
+WorkingDirectory=<deployment-path>
+ExecStart=<deployment-path>/scripts/demo reset-demo --confirm
+```
+
+`/etc/systemd/system/quorfix-demo-reset.timer`:
+
+```ini
+[Unit]
+Description=Run the Quorfix public demo reset every 6 hours
+
+[Timer]
+OnCalendar=*-*-* 00,06,12,18:00:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+Enable with `systemctl enable --now quorfix-demo-reset.timer`.
+
+**Recommended initial cadence: every 6 hours.** Not hardcoded anywhere in the reset command
+itself — purely an external scheduling choice, changed by editing the cron line or the systemd
+timer's `OnCalendar=`, with no code or redeploy involved. Don't schedule more frequently than
+necessary: each run briefly returns 503 on mutating API requests (see "Concurrent mutations
+during reset" below), so a tighter cadence trades demo continuity for freshness with no
+correctness benefit past what visitors can actually generate in the interval.
+
+### Safety guards (all independently enforced, backend-side)
+
+1. `--confirm-demo-reset` was passed to the management command (the shell wrapper's `--confirm`
+   maps to this — it does not itself bypass anything below).
+2. `QUORFIX_DEMO_MODE=true`.
+3. `QUORFIX_DEMO_RESET_ENABLED=true` — a **second, independent** flag from `QUORFIX_DEMO_MODE`;
+   enabling Quick Access login alone never also enables reset. Must be set explicitly in this
+   deployment's `.env`/`.env.demo` (see `.env.example`).
+4. An organization slugged `quorfix-demo` must actually exist — otherwise this database doesn't
+   look like a demo database at all, regardless of what the flags above claim.
+5. `QUORFIX_DISPOSABLE_DATABASE=true`, transitively, via the same guard every other
+   demo-seeding command already uses (`seed_demo`, called internally as the reseed step).
+6. A PostgreSQL advisory lock (`apps.core.pg_advisory_lock`) — a second reset attempt while one
+   is already running refuses immediately (`ERROR: demo reset already in progress`, non-zero
+   exit) rather than queuing behind it. Session-scoped, so a crashed reset process's lock is
+   released automatically by PostgreSQL when its connection drops — never a stuck lock file.
+7. Every deletion is scoped by an explicit `organization=<the demo organization>` filter — never
+   a blanket table truncation, `docker compose down -v`, `DROP DATABASE`, or `manage.py flush`.
+   Non-demo users, staff/superuser accounts, and every other organization's data are structurally
+   unreachable by this command regardless of what's in the demo organization.
+8. The entire reset (delete transient data → repair/reseed canonical data → verify) runs inside
+   one database transaction — a failure at any point rolls back everything, so a reset never
+   commits a half-seeded demo. Verification (all five personas correct, canonical org/projects/
+   bugs present) happens *before* commit, not after — a verification failure is a rollback, never
+   a false "PASS".
+
+### Concurrent mutations during reset
+
+For the brief window the reset transaction is open, every organization-scoped mutating API
+request (`POST`/`PUT`/`PATCH`/`DELETE`) returns `503` (`apps.core.demo_reset_guard`) — closing the
+"a visitor's write lands between delete and reseed" race without per-task reset-awareness
+scattered through every service module. Read requests are never blocked. Entirely inert (no
+effect on request handling at all) unless `QUORFIX_DEMO_MODE=true`. A real reset typically
+finishes in a few seconds against the seed dataset's actual size; the flag also carries a 15-minute
+safety-net expiry so a crashed reset process can never leave the demo read-only indefinitely.
+
+### Demo sessions and reset
+
+```text
+Demo sessions survive reset: YES
+```
+
+The five personas' `User` rows are never deleted and recreated by a reset — only repaired in
+place (role, `first_name`/`last_name`, password if drifted, and `is_active`/`is_staff`/
+`is_superuser` if tampered). Since the same database primary key persists, an already-authenticated
+visitor's session cookie remains valid straight through a reset. This is safe specifically because
+no request handler in this codebase caches organization/role from the session — `apps.
+organizations.authentication.OrganizationAwareSessionAuthentication` re-reads the caller's
+`OrganizationMembership` from the database on every single request — so if a reset repairs a
+role that had drifted, that correction takes effect on the visitor's very next request with no
+stale-permission window and no explicit session invalidation required.
+
+### Uploaded files / media
+
+Every attachment scoped to the demo organization is removed as part of a reset (Community's
+demo upload policy keeps uploads enabled — see `docs/SECURITY.md` "Upload policy (public demo)"
+— so visitor uploads do accumulate between resets and must be cleared). Each attachment's
+underlying storage file is deleted via `apps.attachments.providers.get_storage_provider()` (the
+same abstraction the application itself uses, never a shell `rm` against a client-derived path) —
+a missing file is logged and skipped, not a fatal error for the whole reset.
+
+### Celery during reset
+
+No task in this codebase accepts a client-chosen task name or otherwise executes arbitrary work —
+every dispatch is a fixed, known task (`apps.notifications.tasks`, `apps.attachments.tasks`).
+Both already tolerate operating on a since-deleted target without corrupting anything: attachment
+cleanup is idempotent (deleting an already-absent storage key is a no-op), and the maintenance
+window above closes off *new* mutations (so no *new* notification/cleanup task gets queued as a
+side effect of a reset) — the only remaining exposure is a task that was queued in the instant
+before the window opened, which is bounded, self-tolerant, and not worth revoking via
+broker-specific queue introspection for the risk it would add of purging something unintended.
+Nothing in the demo's actual workflows can queue an expensive or long-running job.
+
+### Cache / Redis cleanup
+
+Deliberately does **not** run `FLUSHALL` or touch Redis at all. Two categories of state live
+there: throttle counters (`docs/SECURITY.md` "Rate limiting") — never reset, on purpose, so a
+reset can never become a way for an abusive client to reset its own rate-limit budget — and the
+analytics dashboard cache (`apps.analytics.caching`, `ANALYTICS_CACHE_TTL_SECONDS`, 60 seconds by
+default), which self-heals within its own short TTL and already tolerates a cache-backend read/
+write failure by falling back to a direct query, making explicit invalidation unnecessary
+complexity for a cosmetic ≤60-second staleness window. Django's built-in Redis cache backend
+(`django.core.cache.backends.redis.RedisCache`, used here) has no pattern/wildcard delete
+primitive in the first place — implementing one would mean bypassing Django's cache abstraction
+entirely for this single, low-value case.
+
+### Backup behavior
+
+- **Manual reset** (`scripts/demo reset-demo --confirm`): does **not** automatically create a
+  backup. Request one explicitly first if desired: `scripts/demo backup && scripts/demo
+  reset-demo --confirm`.
+- **Scheduled reset**: never creates a backup automatically, deliberately — a backup on every
+  6-hourly run would accumulate without bound on a disposable demo host's disk. Routine
+  backups (if wanted at all for a fully disposable public demo) are a separate, independently
+  scheduled job with its own retention policy — not something a data-reset command should also
+  own.
+- **Retention**: none implemented by the reset path itself, for the reason above. If an operator
+  adds scheduled backups separately, they are responsible for that job's own retention/rotation.
+
+### Recovery after a failed reset
+
+A failed reset (`DEMO RESET FAIL`, non-zero exit) means the entire attempt rolled back — the demo
+is in exactly the state it was in before the attempt, never a half-reset state (see "Safety
+guards" above). Do not immediately rerun destructive commands blindly:
+
+1. Read the logged error — every failure logs a specific reason (a guard refusal, "already in
+   progress", or the exception from whatever step failed) before printing `DEMO RESET FAIL`.
+2. If it was a guard refusal (missing flag, missing organization), fix the configuration and
+   retry `scripts/demo reset-demo --confirm`.
+3. If it was "already in progress", another reset (manual or scheduled) is genuinely running —
+   wait for it to finish and check whether it itself succeeded before retrying.
+4. If it was a genuine error during the delete/reseed/verify phase, `scripts/demo health` first —
+   confirm the application itself is still healthy (it should be; the failed transaction rolled
+   back). If the error recurs on retry, this is a real bug or data-integrity issue, not a
+   transient failure — escalate rather than repeatedly retrying, and consider §4's heavier
+   snapshot-restore procedure as a fallback only if a real backup exists to restore from.

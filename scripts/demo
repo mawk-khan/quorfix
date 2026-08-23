@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/demo — operator entry point for the Quorfix public demo lifecycle
-# (deploy/start/stop/restart/status/health/logs/backup). See
+# (deploy/start/stop/restart/status/health/logs/backup/reset-demo). See
 # docs/DEMO_DEPLOYMENT.md "Operator commands" for the full guide.
 #
 # Usage:
@@ -49,7 +49,7 @@ Commands:
   health         Run application health checks (liveness/readiness/frontend/migrations)
   logs [SERVICE] Follow logs — all services, or one of: ${DEMO_SERVICES[*]}
   backup [DIR]   Create a coordinated database + attachments backup
-  reset-demo     Disabled — guarded reset ships in release Step 4
+  reset-demo --confirm   Guarded reset to canonical demo state (see docs/DEMO_DEPLOYMENT.md)
   help           Show this message
 
 Environment:
@@ -174,16 +174,42 @@ cmd_deploy() {
 }
 
 cmd_reset_demo() {
+  require_docker
   print_environment_banner
-  cat >&2 <<'EOF'
+  require_demo_env
 
-ERROR: demo reset is not enabled.
-Guarded reset will be implemented during release Step 4.
+  # An operational guard against an accidental keystroke, not
+  # authentication — the real safety conditions (QUORFIX_DEMO_MODE,
+  # QUORFIX_DEMO_RESET_ENABLED, the demo organization actually existing,
+  # the advisory lock) are all enforced backend-side by
+  # `manage.py reset_public_demo` itself and hold regardless of this flag.
+  # See docs/DEMO_DEPLOYMENT.md "Guarded automatic demo reset".
+  case "${1:-}" in
+    --confirm) : ;;
+    *)
+      die "refusing to run without --confirm, e.g.: scripts/demo reset-demo --confirm
+This does not bypass any of the backend's own safety checks (QUORFIX_DEMO_MODE,
+QUORFIX_DEMO_RESET_ENABLED, the demo organization existing, the reset lock) — it
+only confirms a human or scheduler meant to type this specific command."
+      ;;
+  esac
 
-This command performs no action: no database flush, fixture reload, volume
-deletion, or user recreation happens here.
-EOF
-  exit 1
+  log "Running guarded demo reset ..."
+  if compose exec -T backend python manage.py reset_public_demo --confirm-demo-reset; then
+    log ""
+    log "== Health check =="
+    if "$SCRIPT_DIR/upgrade_smoke.sh" -f "$COMPOSE_FILE" -e "$ENV_FILE"; then
+      log ""
+      log "Reset complete and healthy."
+    else
+      log ""
+      die "Reset succeeded but post-reset health checks failed — see output above."
+    fi
+  else
+    die "reset_public_demo failed — see output above. The reset ran inside a single database
+transaction, so no partial/half-seeded state was committed; the demo is exactly as it was
+before this attempt."
+  fi
 }
 
 COMMAND="${1:-help}"

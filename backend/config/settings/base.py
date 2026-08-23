@@ -183,6 +183,13 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
+        # Inert unless settings.QUORFIX_DEMO_MODE is on — see
+        # apps.core.demo_reset_guard. Applies to every view that keeps the
+        # default permission list (every AllowAny view, e.g. login/setup,
+        # explicitly overrides permission_classes and is therefore
+        # unaffected — which is correct, since none of those touch
+        # organization-scoped demo data).
+        "apps.core.demo_reset_guard.DemoResetInProgressPermission",
     ],
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.BoundedPageNumberPagination",
     "PAGE_SIZE": 25,
@@ -261,6 +268,15 @@ QUORFIX_DEMO_MODE = get_bool("QUORFIX_DEMO_MODE", False)
 # here.
 if QUORFIX_DEMO_MODE:
     SESSION_COOKIE_AGE = get_int("QUORFIX_DEMO_SESSION_COOKIE_AGE_SECONDS", 4 * 60 * 60)
+
+# A second, independent flag from QUORFIX_DEMO_MODE — enabling Quick Access
+# login must never, by itself, also enable a destructive reset command.
+# apps.core.management.commands.reset_public_demo requires this to be true
+# in addition to QUORFIX_DEMO_MODE, the --confirm-demo-reset CLI flag, and
+# the demo organization actually existing — see that command's docstring
+# for the full list of independent conditions it checks before touching
+# anything. Defaults False; must stay False for an ordinary installation.
+QUORFIX_DEMO_RESET_ENABLED = get_bool("QUORFIX_DEMO_RESET_ENABLED", False)
 
 # Comments: how long after posting an author may still edit/delete their own
 # comment. Administrators are not bound by this window.
