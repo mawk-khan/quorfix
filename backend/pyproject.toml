@@ -1,3 +1,12 @@
+# Descriptive metadata only — no [build-system] table exists, so this isn't
+# used to build/publish a package (the backend deploys as a Django app in a
+# container, not via PyPI). No `version` field: the repository-root VERSION
+# file is the single source of truth (see docs/RELEASING.md); duplicating it
+# here would just be another place for it to drift.
+[project]
+name = "quorfix-backend"
+license = "Apache-2.0"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
