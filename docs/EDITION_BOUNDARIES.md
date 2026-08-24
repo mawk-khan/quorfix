@@ -60,12 +60,9 @@ maintained indefinitely without access to the private Professional repository."
 
 ### Remote strategy (existing)
 
-Community currently pushes to two remotes:
-
-```text
-origin    → github.com/mawk-khan/quorfix     (public, primary)
-bitbucket → bitbucket.org/aivah/bug-fixer    (internal)
-```
+Community currently pushes to two remotes: `origin` (`github.com/mawk-khan/quorfix`, public,
+primary) and an internal `bitbucket` working/backup remote (not publicly documented here by URL —
+it is not part of Community's public identity).
 
 **Decision: Bitbucket remains an internal backup/working remote, not an official public Community
 mirror.** GitHub (`origin`) is the single public source of truth referenced by documentation,

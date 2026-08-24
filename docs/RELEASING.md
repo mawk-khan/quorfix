@@ -113,8 +113,8 @@ hand, link/quote it. Include:
 
 - The version and release date.
 - A short summary of what's new (from `CHANGELOG.md`'s "Added" section).
-- Known beta limitations (from `CHANGELOG.md`'s "Known beta limitations" section) — every
-  release notes post repeats these until they're actually resolved, not just for the first one.
+- Known limitations (from `CHANGELOG.md`'s "Known limitations" section) — every release notes
+  post repeats these until they're actually resolved, not just for the first one.
 - The image digests recorded in the release workflow's job summary.
 - Upgrade instructions (link to `docs/UPGRADING.md`) if this is not the first release.
 

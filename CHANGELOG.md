@@ -3,19 +3,20 @@
 All notable changes to Quorfix are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project
-uses [Semantic Versioning](https://semver.org/) with a prerelease suffix during beta
-(`0.Y.Z-beta.N`). See `docs/RELEASING.md` for how a release is cut and `VERSION` (repository
-root) for the current source-of-truth version string.
+uses [Semantic Versioning](https://semver.org/). See `docs/RELEASING.md` for how a release is cut
+and `VERSION` (repository root) for the current source-of-truth version string.
 
 ## [Unreleased]
 
 Nothing yet.
 
-## [0.5.0-beta.1] — Unreleased
+## [1.0.0] — 2026-08-24
 
-First public beta. Release date is unset until this version is actually tagged and published —
-see `docs/RELEASING.md`'s checklist, which this version will not be tagged against until every
-item on it is resolved.
+First stable Community release. An earlier `0.5.0-beta.1` entry existed in this file during
+development but was **never tagged or published** — the project owner made the decision to
+proceed directly to `1.0.0` instead of cutting that beta, so this entry supersedes it and is the
+first real release this changelog describes. Nothing below claims `0.5.0-beta.1` shipped, because
+it did not.
 
 ### Added
 
@@ -36,7 +37,7 @@ item on it is resolved.
 - **Local attachments** — upload/download for bug attachments, content-type and size validation,
   signature verification against the declared content type, sanitized filenames, local
   filesystem storage provider behind a swappable `StorageProvider` interface (no S3 provider
-  yet — see [Known beta limitations](#known-beta-limitations)).
+  yet — see [Known limitations](#known-limitations)).
 - **Notifications** — in-app notifications for assignment/mention/comment/status-change/reopen
   events, per-user-per-event email preferences, deduplicated delivery, basic email notifications.
 - **Dashboard analytics** — open/overdue/new/resolved bug summaries, status and severity
@@ -57,8 +58,8 @@ item on it is resolved.
   tenant-isolation test coverage across every Community app.
 - **Accessibility** — automated `axe-core` scanning in the Playwright suite, keyboard-navigation
   coverage, focus management on client-side navigation and destructive-dialog flows, skip link,
-  accessible names/labels across forms and interactive components (see [Known beta
-  limitations](#known-beta-limitations) for what this does not claim).
+  accessible names/labels across forms and interactive components (see [Known
+  limitations](#known-limitations) for what this does not claim).
 - **Performance validation** — disposable large-scale (~100,000-bug) dataset generation and
   measurement tooling, evidence-based indexing/query decisions documented in
   `docs/PERFORMANCE.md`.
@@ -71,8 +72,30 @@ item on it is resolved.
 - **Confirmed contact channels** — `security@quorfix.com` (vulnerability reports, see
   `docs/SECURITY.md`) and `conduct@quorfix.com` (Code of Conduct enforcement, see
   `CODE_OF_CONDUCT.md`) are real, monitored addresses.
+- **Secure public demo access** — a Quick Access flow letting a visitor sign in directly as one
+  of five fixed personas (administrator, developer, QA, reporter, viewer) without a real account,
+  backed by strict server-side role/membership validation and protection against mutating the
+  demo personas' own identity or security fields.
+- **Public-demo hardening** — environment-gated demo mode, a dedicated demo mail sink so demo
+  visitors' email never leaves the instance, demo-scoped mutation rate limiting, and defense in
+  depth for the public demo deployment (see `docs/SECURITY.md`, `docs/DEMO_DEPLOYMENT.md`).
+- **Demo lifecycle and deployment tooling** — `scripts/demo` (deploy/start/stop/restart/logs/
+  backup/health/reset-demo), environment validation, and an environment-gated, explicitly
+  confirmed, advisory-locked, transactional demo reset that restores the canonical demo dataset
+  while leaving non-demo data, staff, and superuser accounts untouched (see
+  `docs/DEMO_DEPLOYMENT.md`).
+- **Community feature freeze** — `docs/COMMUNITY_RELEASE_POLICY.md` establishes the frozen
+  Community `v1.0.0` product boundary and what Community continues to accept (security/bug/
+  compatibility fixes, dependency maintenance, documentation, scoped usability improvements)
+  after this release. Community remains a maintained product — the freeze means stable scope,
+  not end-of-life.
+- **Community/Professional edition boundary** — `docs/EDITION_BOUNDARIES.md` and
+  `docs/LICENSING.md` formally define the repository, dependency-direction, extension, and
+  licensing boundary between Quorfix Community (Apache-2.0, this repository) and the separate,
+  commercially-licensed Quorfix Professional (private repository, not yet created, no code in
+  this repository).
 
-### Known beta limitations
+### Known limitations
 
 - Community supports **one active organization per installation** — this is a Community product
   boundary (see `CLAUDE.md`), not a bug; Professional will support multiple organizations.
@@ -91,7 +114,9 @@ item on it is resolved.
   terminates TLS or sends HSTS (see `docs/SECURITY.md` "HTTPS / reverse-proxy responsibility").
 - **No Professional features** exist in this release — licensing, entitlements, custom
   workflows/fields, SSO/SAML/SCIM, advanced analytics, integrations, and automation are all
-  out of scope for Community and are not included here.
+  out of scope for Community and are not included here (see `docs/EDITION_BOUNDARIES.md` for the
+  recommended Professional boundary, and `docs/COMMUNITY_RELEASE_POLICY.md` for what Community
+  does and doesn't accept going forward).
 - **No formal WCAG conformance certification** — automated `axe-core` coverage plus a manual
   pass exist, but no live screen-reader (NVDA/JAWS/VoiceOver/Orca) session has been performed;
   see `docs/ACCESS_AND_TESTING.md`'s accessibility chunk entry for exactly what was and wasn't
