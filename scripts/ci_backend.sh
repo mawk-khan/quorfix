@@ -17,7 +17,15 @@ COMPOSE_FILE="docker-compose.yml"
 
 run() {
   echo "+ $*" >&2
-  docker compose -f "$COMPOSE_FILE" exec -T backend "$@"
+  # .github/workflows/backend.yml sets DJANGO_SETTINGS_MODULE=config.settings.test
+  # job-wide for every step below. Without this override, `docker compose exec`
+  # silently inherits the backend container's own DJANGO_SETTINGS_MODULE
+  # (config.settings.development per docker-compose.yml), which has looser,
+  # Redis-backed throttle rates shared across the whole run instead of
+  # config.settings.test's per-run LocMemCache — causing this script to
+  # produce results the real CI gate would not (e.g. spurious 429s from
+  # rate-limited endpoints exercised many times in quick succession).
+  docker compose -f "$COMPOSE_FILE" exec -T -e DJANGO_SETTINGS_MODULE=config.settings.test backend "$@"
 }
 
 run ruff check .

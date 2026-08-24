@@ -31,6 +31,11 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,  # noqa: F405
     "DEFAULT_THROTTLE_RATES": {
+        # Spread base's rates first so any scope added to base.py in the
+        # future (e.g. membership-mutation, demo-mutation) is inherited
+        # automatically instead of silently disappearing under dev/CI
+        # settings because this dict replaces base's wholesale.
+        **REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],  # noqa: F405
         "login": "100/min",
         "setup": "100/min",
         "setup-status": "1000/min",
